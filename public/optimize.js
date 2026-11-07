@@ -24,8 +24,21 @@ export function priceOf(mod, { level = 4, flea = true }) {
 
 export const slotsOf = item => item.properties?.slots ?? [];
 
-// shortcut: ignora conflictingItems (peças que não cabem juntas); checar a build final no jogo.
-export function optimize(gun, modsById, { budget = Infinity, mode = 'recoil', level = 4, flea = true } = {}) {
+// Peças que não cabem juntas (conflictingItems): proíbe uma das duas e refaz, ficando com a melhor.
+// shortcut: no máximo 4 rodadas (até 16 cálculos); se ainda sobrar conflito, a build volta com conflict: true.
+export function optimize(gun, modsById, opts = {}, banned = new Set(), round = 0) {
+  const b = best(gun, modsById, opts, banned);
+  if (!b) return null;
+  const ids = new Set(b.parts.map(p => p.mod.id));
+  const clash = b.parts.find(p => (p.mod.conflictingItems ?? []).some(c => ids.has(c.id)));
+  if (!clash) return b;
+  if (round >= 4) return { ...b, conflict: true };
+  const other = clash.mod.conflictingItems.find(c => ids.has(c.id)).id;
+  return [clash.mod.id, other].map(id => optimize(gun, modsById, opts, new Set([...banned, id]), round + 1))
+    .filter(Boolean).sort((x, y) => (x.conflict ?? false) - (y.conflict ?? false) || y.score - x.score)[0] ?? null;
+}
+
+function best(gun, modsById, { budget = Infinity, mode = 'recoil', level = 4, flea = true } = {}, banned) {
   const [wr, we] = { recoil: [1, 0.1], ergo: [0.1, 1], balanced: [1, 1] }[mode];
   const memo = new Map();
 
@@ -45,7 +58,7 @@ export function optimize(gun, modsById, { budget = Infinity, mode = 'recoil', le
     const pts = slot.required ? [] : [{ c: 0, s: 0, mod: null, kids: [] }];
     for (const { id } of slot.filters?.allowedItems ?? []) {
       const mod = modsById.get(id);
-      if (mod) pts.push(...itemFront(mod, stack));
+      if (mod && !banned.has(id)) pts.push(...itemFront(mod, stack));
     }
     return prune(pts);
   }
@@ -63,7 +76,7 @@ export function optimize(gun, modsById, { budget = Infinity, mode = 'recoil', le
 
   const front = combine([{ c: 0, s: 0, kids: [] }], slotsOf(gun), new Set()).filter(p => p.c <= budget);
   if (!front.length) return null;
-  const best = front.reduce((a, b) => (b.s > a.s ? b : a));
+  const top = front.reduce((a, b) => (b.s > a.s ? b : a));
 
   // Totais da build escolhida
   let ergo = gun.properties.ergonomics ?? 0, recoil = 0;
@@ -76,10 +89,10 @@ export function optimize(gun, modsById, { budget = Infinity, mode = 'recoil', le
       parts.push({ depth, slot: k.slot, mod: k.mod, offer: k.offer });
       walk(k.kids, depth + 1);
     }
-  })(best.kids, 0);
+  })(top.kids, 0);
   const f = 1 + recoil / 100;
   return {
-    cost: best.c, ergo: Math.round(ergo), parts,
+    cost: top.c, score: top.s, ergo: Math.round(ergo), parts,
     recoilVertical: Math.round(gun.properties.recoilVertical * f),
     recoilHorizontal: Math.round(gun.properties.recoilHorizontal * f),
   };

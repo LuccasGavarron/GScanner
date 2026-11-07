@@ -4,7 +4,7 @@ import { optimize } from './optimize.js';
 const S = 'name nameId required filters { allowedItems { id } }';
 const QUERY = `{
   guns: items(type: gun) { id name shortName properties { ... on ItemPropertiesWeapon { ergonomics recoilVertical recoilHorizontal slots { ${S} } } } }
-  mods: items(type: mods) { id name shortName ergonomicsModifier recoilModifier
+  mods: items(type: mods) { id name shortName ergonomicsModifier recoilModifier conflictingItems { id }
     buyFor { priceRUB vendor { normalizedName ... on TraderOffer { minTraderLevel } } }
     properties { ... on ItemPropertiesWeaponMod { slots { ${S} } } ... on ItemPropertiesBarrel { slots { ${S} } }
       ... on ItemPropertiesMagazine { slots { ${S} } } ... on ItemPropertiesScope { slots { ${S} } } } }
@@ -23,7 +23,7 @@ function run() {
     <td>${signed(p.mod.recoilModifier)}%</td><td>${signed(p.mod.ergonomicsModifier)}</td><td>${rub(p.offer.price)}</td><td>${vendor(p.offer.vendor)}</td></tr>`).join('');
   $('#build-out').innerHTML = `<p><b>Ergonomia ${b.ergo} · Recuo vertical ${b.recoilVertical} · Recuo horizontal ${b.recoilHorizontal} · Custo das peças ${rub(b.cost)}</b></p>
     <table><tr><th>Slot</th><th>Peça</th><th>Recuo</th><th>Ergo</th><th>Preço</th><th>Onde comprar</th></tr>${rows}</table>
-    <p class="muted">Confira no jogo se duas peças não conflitam entre si: o otimizador ainda não checa isso.</p>`;
+    ${b.conflict ? '<p>Atenção: sobrou peça conflitante nesta build. Confira no jogo.</p>' : ''}`;
 }
 
 export async function initBuild() {

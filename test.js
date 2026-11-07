@@ -14,6 +14,27 @@ test('andar pela altura e pela área', () => {
 });
 import { optimize } from './public/optimize.js';
 import { BANDS, toBands, footstepProfile, suggestEq } from './public/sound.js';
+import { answer } from './offline.js';
+
+test('cópia JSON vira resposta das abas', () => {
+  const d = {
+    items: { data: { items: {
+      a: { id: 'a', name: 'a Name', shortName: 'a Short', types: ['ammo'], properties: { propertiesType: 'ItemPropertiesAmmo', caliber: 'Caliber9x19PARA', damage: 50, penetrationPower: 30, armorDamage: 40, fragmentationChance: 0.1, initialSpeed: 400, projectileCount: 1 }, avg24hPrice: 100 },
+      m: { id: 'm', name: 'm Name', shortName: 'm Short', types: ['mods'], recoilModifier: -5, ergonomicsModifier: 2, lastLowPrice: 900, buyFromTrader: [{ trader: 't', priceRUB: 1000, minTraderLevel: 2 }], properties: null, width: 1, height: 1 },
+      l: { id: 'l', name: 'l Name', shortName: 'l Short', types: ['barter'], width: 1, height: 1, lastLowPrice: 500000, avg24hPrice: 550000, sellToTrader: [{ trader: 't', priceRUB: 300000 }] },
+    } } },
+    itemsEn: { 'a Name': 'Luger', 'a Short': 'Lug', 'm Name': 'Brake', 'm Short': 'Brk', 'l Name': 'LEDX Skin Transilluminator', 'l Short': 'LEDX' },
+    traders: { data: { t: { normalizedName: 'prapor' } } },
+    tasks: { data: { tasks: { x: { name: 'x Name', objectives: [{ type: 'giveItem', items: ['l'] }] } } } },
+    tasksEn: { 'x Name': 'Private Clinic' },
+  };
+  assert.equal(answer(d, { query: '{ ammo { caliber } }' }).ammo[0].item.name, 'Luger');
+  const mod = answer(d, { query: '{ guns: items(type: gun) {} mods: x }' }).mods[0];
+  assert.deepEqual(mod.buyFor.map(o => [o.vendor.normalizedName, o.priceRUB]), [['prapor', 1000], ['flea-market', 900]]);
+  const [ledx] = answer(d, { query: 'query($q: String) { items(name: $q) {} }', variables: { q: 'ledx' } }).items;
+  assert.equal(ledx.sellFor[0].vendor.name, 'Prapor');
+  assert.deepEqual(ledx.usedInTasks, [{ name: 'Private Clinic' }]);
+});
 
 test('medidor de passos acha as bandas dos passos', () => {
   const bg = BANDS.map(() => -60);
@@ -53,6 +74,16 @@ test('build respeita orçamento, nível de trader e flea', () => {
   assert.equal(names(optimize(gun, mods, { budget: 2000 })), 'brakeA,stockA');
   assert.equal(names(optimize(gun, mods, { level: 2, flea: false })), 'brakeA,stockA');
   assert.equal(optimize(gun, mods, { budget: 100 }), null); // slot obrigatório sem opção que caiba
+});
+
+test('build não junta peças conflitantes', () => {
+  const clash = new Map(mods);
+  clash.set('brakeB', { ...mods.get('brakeB'), conflictingItems: [{ id: 'padA' }] });
+  const b = optimize(gun, clash);
+  const ids = b.parts.map(p => p.mod.id);
+  assert.ok(!(ids.includes('brakeB') && ids.includes('padA')), ids.join(','));
+  assert.equal(b.recoilVertical, 72); // as duas saídas sem conflito dão -28%
+  assert.ok(!b.conflict);
 });
 
 test('screenshot com posição e rotação', () => {

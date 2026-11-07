@@ -5,6 +5,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { parseScreenshot, mapFromLogLine, mapKey } from './public/shared.js';
+import * as offline from './offline.js';
 
 const PORT = Number(process.env.PORT) || 7777;
 const PUBLIC = path.join(import.meta.dirname, 'public');
@@ -82,6 +83,10 @@ function proxy(req, res) {
       fs.writeFileSync(file, text);
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(text);
     } catch {
+      try {
+        const data = offline.answer(await offlineData(), JSON.parse(body));
+        if (data) return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data }));
+      } catch { /* sem cópia JSON: tenta o cache da API */ }
       fs.readFile(file, 'utf8', (err, text) => err
         ? res.writeHead(503, { 'Content-Type': 'application/json' }).end('{"errors":[{"message":"API do tarkov.dev fora do ar e sem cópia salva. Tente mais tarde."}]}')
         : res.writeHead(200, { 'Content-Type': 'application/json', 'X-Cache-Date': fs.statSync(file).mtime.toISOString() }).end(text));
@@ -103,6 +108,12 @@ async function cachedGet(name) {
     return JSON.parse(fs.readFileSync(file, 'utf8')); // sem rede: última cópia; sem cópia: erro sobe
   }
 }
+// shortcut: cópia carregada uma vez por execução do servidor; reiniciar para pegar preços novos.
+let offlineCache;
+const offlineData = () => (offlineCache ??= Promise.all(['items', 'items_en', 'traders', 'tasks', 'tasks_en'].map(cachedGet))
+  .then(([items, itemsEn, traders, tasks, tasksEn]) => ({ items, itemsEn: itemsEn.data, traders, tasks, tasksEn: tasksEn.data }))
+  .catch(e => { offlineCache = null; throw e; }));
+
 let extracts;
 async function getExtracts() {
   if (extracts) return extracts;
