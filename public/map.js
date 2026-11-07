@@ -21,7 +21,20 @@ function crs(m) {
 }
 
 const maps = {};
-let current, leaflet, me, pings, floorLayer, bounds;
+let current, leaflet, me, pings, floorLayer, bounds, extractLayer, extracts = {};
+
+const EX_COLOR = { pmc: '#4c4', scav: '#4af', shared: '#c6f', transit: '#fa3' };
+const EX_SHOW = { pmc: ['pmc', 'shared', 'transit'], scav: ['scav', 'shared', 'transit'], all: Object.keys(EX_COLOR), none: [] };
+
+function drawExtracts() {
+  extractLayer.clearLayers();
+  const show = EX_SHOW[$('#extract-filter').value];
+  for (const e of extracts[$('#map-select').value] ?? []) {
+    if (!show.includes(e.faction)) continue;
+    L.circleMarker([e.z, e.x], { radius: 6, color: '#000', weight: 1, fillColor: EX_COLOR[e.faction], fillOpacity: 1, interactive: false })
+      .bindTooltip(e.name, { permanent: true, direction: 'right', className: 'ex-label' }).addTo(extractLayer);
+  }
+}
 export const resizeMap = () => leaflet?.invalidateSize();
 
 // Andar por cima do térreo; -1 = só o térreo
@@ -45,9 +58,12 @@ function showMap(key) {
   m.layers = (m.layers ?? []).filter(l => l.tilePath);
   $('#floor').innerHTML = '<option value="-1">Térreo</option>' + m.layers.map((l, i) => `<option value="${i}">${l.name}</option>`).join('');
   floorLayer = null;
-  leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, attributionControl: false });
+  // wheelPxPerZoomLevel alto = rodinha menos sensível (padrão do Leaflet é 60)
+  leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 200, attributionControl: false });
   L.tileLayer(m.tilePath, { tileSize: m.tileSize || 256, bounds }).addTo(leaflet);
   leaflet.fitBounds(bounds);
+  extractLayer = L.layerGroup().addTo(leaflet);
+  drawExtracts();
   pings = L.layerGroup().addTo(leaflet);
   me = null;
   leaflet.on('click', e => L.marker(e.latlng, { icon: L.divIcon({ className: '', html: '<div class="ping"></div>', iconSize: [18, 18] }) })
@@ -62,7 +78,7 @@ function showPosition(p) {
   const icon = L.divIcon({ className: '', html: `<div class="me" style="transform: rotate(${p.yaw + add}deg)"></div>`, iconSize: [16, 20] });
   const ll = [p.z, p.x];
   me ? me.setLatLng(ll).setIcon(icon) : (me = L.marker(ll, { icon, interactive: false }).addTo(leaflet));
-  leaflet.panTo(ll);
+  if ($('#follow').checked) leaflet.panTo(ll);
   showFloor(floorAt(current.layers, p));
   $('#map-status').textContent = `Você: x ${p.x.toFixed(0)}, z ${p.z.toFixed(0)}, altura ${p.y.toFixed(1)}`;
 }
@@ -71,8 +87,14 @@ export async function initMap() {
   $('#map-select').onchange = e => showMap(e.target.value);
   $('#clear-pings').onclick = () => pings?.clearLayers();
   $('#floor').onchange = e => showFloor(+e.target.value);
+  $('#extract-filter').onchange = drawExtracts;
+  $('#follow').onchange = e => e.target.checked && me && leaflet.panTo(me.getLatLng());
 
-  const mapData = await fetch(MAPS_URL).then(r => r.json()).catch(() => []);
+  const [mapData, ex] = await Promise.all([
+    fetch(MAPS_URL).then(r => r.json()).catch(() => []),
+    fetch('/extracts').then(r => r.json()).catch(() => ({})),
+  ]);
+  extracts = ex;
   if (!mapData.length) $('#map-status').textContent = 'Não consegui baixar os mapas do tarkov.dev.';
   for (const group of mapData) {
     const m = group.maps.find(x => x.projection === 'interactive');

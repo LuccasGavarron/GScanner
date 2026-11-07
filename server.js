@@ -89,9 +89,44 @@ function proxy(req, res) {
   });
 }
 
+// /extracts: extrações e transições por mapa, da cópia em JSON do site do tarkov.dev (funciona mesmo com a API fora).
+async function cachedGet(name) {
+  const file = path.join(CACHE, name + '.json');
+  try {
+    const r = await fetch('https://json.tarkov.dev/regular/' + name, { signal: AbortSignal.timeout(60_000) });
+    if (!r.ok) throw new Error(r.status);
+    const text = await r.text();
+    fs.mkdirSync(CACHE, { recursive: true });
+    fs.writeFileSync(file, text);
+    return JSON.parse(text);
+  } catch {
+    return JSON.parse(fs.readFileSync(file, 'utf8')); // sem rede: última cópia; sem cópia: erro sobe
+  }
+}
+let extracts;
+async function getExtracts() {
+  if (extracts) return extracts;
+  const [maps, en] = await Promise.all([cachedGet('maps'), cachedGet('maps_en')]);
+  const out = {};
+  for (const m of Object.values(maps.data.maps)) {
+    const key = mapKey(m.nameId);
+    if (out[key]) continue; // variantes (noite, lab escuro) usam o mesmo mapa
+    out[key] = [
+      ...m.extracts.map(e => ({ name: en.data[e.name] ?? e.name, faction: e.faction, x: e.position.x, z: e.position.z })),
+      ...m.transits.map(t => ({ name: en.data[t.description] ?? 'Transit', faction: 'transit', x: t.position.x, z: t.position.z })),
+    ];
+  }
+  return (extracts = out);
+}
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 http.createServer((req, res) => {
   if (req.url === '/api' && req.method === 'POST') return proxy(req, res);
+  if (req.url === '/extracts') {
+    getExtracts().then(e => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(e)),
+      () => res.writeHead(503).end('{}'));
+    return;
+  }
   if (req.url === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
     for (const [type, data] of Object.entries(state)) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);

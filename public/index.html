@@ -26,6 +26,8 @@
   td:first-child, th:first-child, #build-out td:nth-child(2), #build-out th:nth-child(2) { text-align: left; }
   .g0 { background: #5a1d1d; } .g1 { background: #6a4a1a; } .g2 { background: #5d6a1a; } .g3 { background: #1f5a2a; }
   .muted { color: #888; }
+  .ex-label { background: rgba(0, 0, 0, .7); color: #fff; border: 0; box-shadow: none; font-size: 11px; padding: 1px 4px; }
+  .ex-label::before { display: none; }
   .best { color: #7d7; font-weight: bold; }
   #price-q { width: 260px; }
 </style>
@@ -43,6 +45,13 @@
   <div class="bar">
     <select id="map-select"></select>
     <select id="floor" title="Andar"></select>
+    <select id="extract-filter" title="Extrações">
+      <option value="pmc">Extrações PMC</option>
+      <option value="scav">Extrações Scav</option>
+      <option value="all">Todas as extrações</option>
+      <option value="none">Sem extrações</option>
+    </select>
+    <label><input id="follow" type="checkbox" checked> Seguir personagem</label>
     <button id="clear-pings">Limpar pings</button>
     <span class="muted" id="map-status">Clique no mapa para pingar. Print Screen no jogo mostra onde você está.</span>
   </div>
