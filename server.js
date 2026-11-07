@@ -138,7 +138,8 @@ http.createServer((req, res) => {
   if (!file.startsWith(PUBLIC)) return res.writeHead(403).end();
   fs.readFile(file, (err, body) => {
     if (err) return res.writeHead(404).end();
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] ?? 'application/octet-stream' }).end(body);
+    // no-cache: o navegador confere a versão a cada carga, para atualização do app aparecer no F5
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' }).end(body);
   });
 }).listen(PORT, () => {
   const lan = Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address;
