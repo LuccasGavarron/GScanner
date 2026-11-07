@@ -5,6 +5,8 @@ export function initHover() {
   new EventSource('/events').onmessage = e => {
     const { type, data: h } = JSON.parse(e.data);
     if (type !== 'hover') return;
+    $('#hover-card').hidden = !h;
+    if (!h) return;
     const fleaWins = (h.flea ?? 0) >= (h.trader?.price ?? 0);
     $('#hover-card').innerHTML = `
       ${h.trader?.image ? `<img src="${h.trader.image}" alt="${h.trader.name}">` : ''}
@@ -15,6 +17,5 @@ export function initHover() {
         <div class="muted">Por slot: ${rub(h.perSlot)}</div>
         ${h.quests.length ? `<div>⚠ Quest: ${h.quests.join(', ')}</div>` : ''}
       </div>`;
-    $('#hover-card').hidden = false;
   };
 }

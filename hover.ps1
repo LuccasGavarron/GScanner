@@ -38,7 +38,10 @@ $last = ''
 while ($true) {
   Start-Sleep -Milliseconds 300
   if ($env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
-  if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') { continue }
+  if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') {
+    if ($last -ne '[]') { $last = '[]'; [Console]::Out.WriteLine($last); [Console]::Out.Flush() } # saiu do jogo: esconde o cartão
+    continue
+  }
   $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
   # A dica do item aparece ao lado do cursor: região de 900x140 em volta dele
   $bmp = New-Object Drawing.Bitmap 900, 140
