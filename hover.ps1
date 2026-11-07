@@ -59,8 +59,13 @@ function Lines-Json($lines, [int]$cx, [int]$cy) {
 # Arquivo de imagem como argumento: lê uma vez e sai (usado no teste).
 if ($args.Count) { $b = [Drawing.Bitmap]::new($args[0]); Lines-Json (Read-Text $b) ([int]$args[1]) ([int]$args[2]); exit } # teste: imagem, x e y do cursor nela
 
-$last = ''; $lastSig = 0; $n = 0
+$last = ''; $lastSig = 0; $n = 0; $stillAt = ''; $iconAt = ''
 Add-Type -AssemblyName System.Windows.Forms
+# Reconhecimento pelo ícone (icons.cs): imagens de grade em cache/grid; sem elas, só a dica do jogo
+Add-Type -Path (Join-Path $PSScriptRoot 'icons.cs') -ReferencedAssemblies System.Drawing
+$gridDir = Join-Path $PSScriptRoot 'cachegrid'
+if (Test-Path (Join-Path $gridDir 'index.txt')) { [Icons]::Load($gridDir) }
+$slot = 63.0 * [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height / 1080 # espaço da grade: 63 px em 1080p, 84 px em 1440p
 function Emit($json) { if ($json -ne $script:last) { $script:last = $json; [Console]::Out.WriteLine($json); [Console]::Out.Flush() } }
 while ($true) {
   if (($n++ % 50) -eq 0 -and $env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
@@ -69,6 +74,16 @@ while ($true) {
     # Inventário: só a região da dica do jogo, colada ao cursor (à direita, um pouco acima)
     Start-Sleep -Milliseconds 80
     $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
+    # mouse parado num ponto novo: reconhece pelo ícone uma vez (rápido, sem esperar a dica do jogo)
+    $at = "$($p.X),$($p.Y)"
+    if ($at -eq $stillAt -and $at -ne $iconAt -and [Icons]::Count -gt 0) {
+      $iconAt = $at
+      $big = New-Object Drawing.Bitmap 1100, 1100
+      $gb = [Drawing.Graphics]::FromImage($big); $gb.CopyFromScreen($p.X - 550, $p.Y - 550, 0, 0, $big.Size); $gb.Dispose()
+      $r = [Icons]::Identify($big, 550, 550, $slot); $big.Dispose()
+      if ($r) { $script:last = ''; Emit ('{"icon":' + (ConvertTo-Json -Compress $r) + '}') }
+    }
+    $stillAt = $at
     $bmp = New-Object Drawing.Bitmap 760, 240
     $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 40, $p.Y - 160, 0, 0, $bmp.Size); $g.Dispose()
     $cx = 40; $cy = 160; $raid = $false

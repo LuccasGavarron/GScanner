@@ -228,6 +228,14 @@ export function raidPick(d, boxes) {
   return hits[0]?.item ?? null;
 }
 
+// Resultado do reconhecimento pelo ícone (icons.cs): "id largura altura nota segunda". Só vale com nota alta
+// e folga sobre o segundo lugar (balas têm ícones quase iguais: aí espera a dica do jogo).
+export function iconPick(d, text) {
+  const [id, , , best, second] = String(text).split(' ');
+  if (!(Number(best) >= 0.75 && Number(best) - Number(second) >= 0.03)) return null;
+  return items(d).find(i => i.id === id) ?? null;
+}
+
 export function hoverInfo(d, i) {
   const [p] = price(d, null, i);
   const top = p.sellFor.reduce((a, b) => (b.priceRUB > (a?.priceRUB ?? 0) ? b : a), null);

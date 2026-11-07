@@ -33,7 +33,7 @@ test('FFT acha o tom certo', () => {
   const bands = toBands(db, rate, n);
   assert.equal(BANDS[bands.indexOf(Math.max(...bands))], 3150); // 3 kHz cai na banda de 3,15 kHz
 });
-import { answer, findItem, hoverInfo, nearCursor, raidPick, encodeInvite, decodeInvite } from './offline.js';
+import { answer, findItem, hoverInfo, nearCursor, raidPick, iconPick, encodeInvite, decodeInvite } from './offline.js';
 
 test('código de convite ida e volta, e recusa lixo', () => {
   const code = encodeInvite('http://100.109.154.42:7777', 'senha-do-grupo');
@@ -79,6 +79,10 @@ test('cópia JSON vira resposta das abas', () => {
   // raid: nome curto abaixo da mira, o mais perto do centro; "PEGAR" e lixo não contam
   assert.equal(raidPick(d, [['PEGAR', -30, -50, 30, -38], ['LEDX', -25, 40, 25, 52]]).id, 'l');
   assert.equal(raidPick(d, [['PEGAR', -30, -50, 30, -38]]), null);
+  // ícone: só com nota alta e folga sobre o segundo
+  assert.equal(iconPick(d, 'l 1 1 0.981 0.846').id, 'l');
+  assert.equal(iconPick(d, 'l 1 1 0.938 0.929'), null); // quase empate (balas)
+  assert.equal(iconPick(d, 'l 1 1 0.391 0.200'), null); // nota baixa
   const h = hoverInfo(d, findItem(d, ['Transiluminador de pele LEDX']));
   assert.deepEqual([h.name, h.flea, h.trader.name, h.trader.image, h.perSlot, h.quests], ['Transiluminador de pele LEDX', 500000, 'Prapor', 'prapor.webp', 500000, ['Private Clinic']]);
 });

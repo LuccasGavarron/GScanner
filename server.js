@@ -135,6 +135,25 @@ function hoverLog(text) {
   } catch { /* log é só ajuda: nunca derruba o hover */ }
 }
 
+// Imagens de grade de todos os itens (cache/grid/<id>.jpg + index.txt "id largura altura"): referência para
+// reconhecer o item pelo ícone sob o mouse, sem esperar a dica do jogo. Baixa só o que falta.
+async function ensureGrid() {
+  const dir = path.join(CACHE, 'grid');
+  fs.mkdirSync(dir, { recursive: true });
+  const list = Object.values((await offlineData()).items.data.items).map(i => ({ id: i.id, w: i.width, h: i.height }));
+  const todo = list.filter(i => !fs.existsSync(path.join(dir, i.id + '.jpg')));
+  const next = async () => {
+    for (let i; (i = todo.shift());) {
+      try {
+        const r = await fetch(`https://assets.tarkov.dev/${i.id}-grid-image.jpg`, { signal: AbortSignal.timeout(20_000) });
+        if (r.ok) fs.writeFileSync(path.join(dir, i.id + '.jpg'), Buffer.from(await r.arrayBuffer()));
+      } catch { /* falhou: tenta na próxima vez que o servidor subir */ }
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, next));
+  fs.writeFileSync(path.join(dir, 'index.txt'), list.filter(i => fs.existsSync(path.join(dir, i.id + '.jpg'))).map(i => `${i.id} ${i.w} ${i.h}`).join('\n'));
+}
+
 function watchHover() {
   if (process.platform !== 'win32') return;
   const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'hover.ps1')], { env: { ...process.env, GSCANNER_PID: String(process.pid) } });
@@ -150,7 +169,9 @@ function watchHover() {
         const raid = !Array.isArray(msg) && !!msg?.raid;
         const boxes = (raid ? msg.l : msg ?? []).filter(Array.isArray);
         let item, how;
-        if (raid) [item, how] = [offline.raidPick(d, boxes), 'mira']; // em raid: nome curto abaixo da mira
+        if (msg?.icon === 'vazio') [item, how] = [null, 'vazio']; // mouse num espaço vazio da grade
+        else if (msg?.icon) { [item, how] = [offline.iconPick(d, msg.icon), 'ícone']; if (!item) { hoverLog(`ícone incerto <= ${msg.icon}`); continue; } } // incerto: espera a dica
+        else if (raid) [item, how] = [offline.raidPick(d, boxes), 'mira']; // em raid: nome curto abaixo da mira
         else {
           // inventário: só a dica do jogo, colada ao cursor; ela só existe com o mouse em cima de um item
           [item, how] = [offline.findItem(d, offline.nearCursor(boxes).map(b => b[0])), 'dica'];
@@ -453,7 +474,7 @@ const server = http.createServer((req, res) => {
   watchShots();
   publish('version', VERSION);
   setInterval(checkUpdate, 60_000);
-  watchHover();
+  ensureGrid().catch(() => {}).finally(watchHover); // leitor sobe depois das imagens de referência
   // cartão por cima do jogo (Tarkov em janela sem borda); desliga com "overlay": false no config.json
   if (process.platform === 'win32' && cfg.overlay !== false) spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'overlay.ps1'), '-Port', String(PORT), '-ParentPid', String(process.pid)], { stdio: 'ignore' });
   setInterval(pollLogs, 2000);
