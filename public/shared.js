@@ -12,8 +12,11 @@ export function parseScreenshot(name) {
   return { x, y, z, yaw };
 }
 
-// Linha do application.log ao achar partida: "... TRACE-NetworkGameCreate profileStatus ... Location: bigmap, ..."
+// Mapa no application.log. 1.0+: "scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset"
+// Antes da 1.0: "... TRACE-NetworkGameCreate profileStatus ... Location: bigmap, ..."
 export function mapFromLogLine(line) {
+  const scene = /rcid:(\w+)\.scenespreset/.exec(line);
+  if (scene) return scene[1];
   if (!line.includes('TRACE-NetworkGameCreate')) return null;
   return /Location: ([^,\s]+)/.exec(line)?.[1] ?? null;
 }

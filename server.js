@@ -38,7 +38,7 @@ function watchShots() {
   }
 }
 
-// Logs: mapa da raid. Lê só o que foi escrito depois que o servidor subiu.
+// Logs: mapa da raid. Lê o arquivo novo inteiro, para pegar a raid em andamento, e depois só o que entrar.
 let logFile, offset = 0;
 function pollLogs() {
   try {
@@ -47,7 +47,7 @@ function pollLogs() {
     if (!file) return;
     const full = path.join(LOGS, dir, file);
     const size = fs.statSync(full).size;
-    if (full !== logFile) { logFile = full; offset = size; return; }
+    if (full !== logFile) { logFile = full; offset = 0; }
     if (size <= offset) return;
     const buf = Buffer.alloc(size - offset);
     const fd = fs.openSync(full, 'r');

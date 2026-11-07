@@ -50,6 +50,7 @@ test('screenshot com posição e rotação', () => {
 test('mapa no log', () => {
   const line = '2026-11-07 20:15:00.000|1.0|Info|application|TRACE-NetworkGameCreate profileStatus: \'Profileid: x, Status: Busy, RaidMode: Online, Ip: 1.2.3.4, Port: 17000, Location: bigmap, Sid: abc, GameMode: deathmatch, shortId: ABC123\'';
   assert.equal(mapFromLogLine(line), 'bigmap');
+  assert.equal(mapFromLogLine('2026-11-07 02:09:58.006|1.3.0.1.48558|Info|application|scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset'), 'bigmap');
   assert.equal(mapFromLogLine('qualquer coisa Location: woods'), null);
   assert.equal(mapKey('RezervBase'), 'reserve');
 });
