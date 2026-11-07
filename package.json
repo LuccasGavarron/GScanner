@@ -1,0 +1,12 @@
+{
+  "name": "gscanner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Assistente de Escape from Tarkov: mapa com posição por screenshot, pings e tabela de munição.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test.js"
+  },
+  "engines": { "node": ">=22" }
+}

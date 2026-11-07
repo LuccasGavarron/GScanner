@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GScanner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { margin: 0; font: 14px system-ui, sans-serif; background: #111; color: #ddd; display: flex; flex-direction: column; height: 100vh; }
+  nav { display: flex; gap: 4px; padding: 6px; background: #1b1b1b; align-items: center; flex-wrap: wrap; }
+  nav button { background: #2a2a2a; color: #ddd; border: 0; padding: 6px 12px; cursor: pointer; }
+  nav button.on { background: #9a8866; color: #111; }
+  select { background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 4px; }
+  .tab { flex: 1; display: none; overflow: auto; }
+  .tab.on { display: flex; flex-direction: column; }
+  #map { flex: 1; background: #000; }
+  .bar { padding: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .me { width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 20px solid #3cf; transform-origin: 50% 60%; }
+  .ping { width: 14px; height: 14px; border-radius: 50%; background: #f53; border: 2px solid #fff; }
+  table { border-collapse: collapse; margin: 6px; }
+  th, td { padding: 4px 8px; border-bottom: 1px solid #2a2a2a; text-align: right; }
+  th { position: sticky; top: 0; background: #1b1b1b; cursor: pointer; }
+  td:first-child, th:first-child { text-align: left; }
+  .g0 { background: #5a1d1d; } .g1 { background: #6a4a1a; } .g2 { background: #5d6a1a; } .g3 { background: #1f5a2a; }
+  .muted { color: #888; }
+</style>
+</head>
+<body>
+<nav>
+  <b style="padding: 0 8px">GScanner</b>
+  <button data-tab="tab-map" class="on">Mapa</button>
+  <button data-tab="tab-ammo">Munição</button>
+</nav>
+
+<section id="tab-map" class="tab on">
+  <div class="bar">
+    <select id="map-select"></select>
+    <button id="clear-pings">Limpar pings</button>
+    <span class="muted" id="map-status">Clique no mapa para pingar. Print Screen no jogo mostra onde você está.</span>
+  </div>
+  <div id="map"></div>
+</section>
+
+<section id="tab-ammo" class="tab">
+  <div class="bar">
+    <select id="caliber"></select>
+    <span class="muted" id="ammo-status">Carregando munições...</span>
+  </div>
+  <table id="ammo"></table>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
