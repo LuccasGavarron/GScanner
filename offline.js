@@ -49,7 +49,7 @@ export function price(d, q, only) {
   for (const t of Object.values(d.tasks.data.tasks)) {
     for (const o of t.objectives) {
       if (o.type !== 'giveItem') continue;
-      for (const id of o.items ?? []) tasksByItem.set(id, [...(tasksByItem.get(id) ?? []), { name: tr(d.tasksEn, t.name) }]);
+      for (const id of o.items ?? []) tasksByItem.set(id, [...(tasksByItem.get(id) ?? []), { name: tr(d.tasksPt ?? d.tasksEn, t.name) }]);
     }
   }
   return (only ? [only] : items(d)).map(i => ({ i, b: base(d, i) }))
@@ -172,7 +172,9 @@ function nameIndex(d) {
 export function findItem(d, lines) {
   const idx = nameIndex(d);
   let best = null;
-  for (const line of lines) {
+  // nome comprido quebra em duas linhas na dica do jogo: tenta também cada par de linhas vizinhas
+  const tries = [...lines, ...lines.slice(1).map((l, i) => lines[i] + ' ' + l)];
+  for (const line of tries) {
     const n = norm(line);
     if (n.length < 5) continue;
     if (idx.has(n)) return idx.get(n);

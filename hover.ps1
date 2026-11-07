@@ -1,9 +1,12 @@
 ﻿# Lê o texto perto do mouse quando o Tarkov está em primeiro plano (OCR do Windows) e escreve uma linha JSON por leitura.
 # Não toca no processo do jogo: só captura a tela, como um print.
 Add-Type -AssemblyName System.Drawing, System.Runtime.WindowsRuntime
-Add-Type @'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8 # o servidor lê UTF-8; sem isso os acentos chegam embaralhados
+Add-Type -ReferencedAssemblies System.Drawing @'
 using System; using System.Runtime.InteropServices; using System.Diagnostics;
 public static class Win {
+  // assinatura barata da imagem (1 pixel a cada 7): se não mudou, não precisa rodar o OCR de novo
+  public static long Sig(System.Drawing.Bitmap b) { long h = 17; for (int y = 0; y < b.Height; y += 7) for (int x = 0; x < b.Width; x += 7) h = h * 31 + b.GetPixel(x, y).ToArgb(); return h; }
   [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
   [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
@@ -34,10 +37,10 @@ function Read-Text([Drawing.Bitmap]$bmp) {
 # Arquivo de imagem como argumento: lê uma vez e sai (usado no teste).
 if ($args.Count) { Read-Text ([Drawing.Bitmap]::new($args[0])) | ConvertTo-Json -Compress; exit }
 
-$last = ''
+$last = ''; $lastSig = 0; $n = 0
 while ($true) {
-  Start-Sleep -Milliseconds 300
-  if ($env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
+  Start-Sleep -Milliseconds 80
+  if (($n++ % 50) -eq 0 -and $env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
   if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') {
     if ($last -ne '[]') { $last = '[]'; [Console]::Out.WriteLine($last); [Console]::Out.Flush() } # saiu do jogo: esconde o cartão
     continue
@@ -46,6 +49,9 @@ while ($true) {
   # A dica do item aparece ao lado do cursor: região de 900x140 em volta dele
   $bmp = New-Object Drawing.Bitmap 900, 140
   $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 200, $p.Y - 90, 0, 0, $bmp.Size); $g.Dispose()
+  $sig = [Win]::Sig($bmp)
+  if ($sig -eq $lastSig) { $bmp.Dispose(); continue }
+  $lastSig = $sig
   $lines = @(Read-Text $bmp); $bmp.Dispose()
   $json = ConvertTo-Json -Compress -InputObject $lines
   if ($json -ne $last) { $last = $json; [Console]::Out.WriteLine($json); [Console]::Out.Flush() }

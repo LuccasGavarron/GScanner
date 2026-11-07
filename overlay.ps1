@@ -48,8 +48,10 @@ public class Card : Form {
     Location = new Point(x, y);
     Show();
   }
+  [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetWindowDisplayAffinity(IntPtr h, uint a);
   public static void Run(int port, int parent) {
     var card = new Card(); var handle = card.Handle; // cria a janela na thread da interface
+    SetWindowDisplayAffinity(handle, 0x11); // fora das capturas de tela: o leitor do hover não lê o próprio cartão
     new Thread(() => {
       var js = new JavaScriptSerializer();
       while (true) {

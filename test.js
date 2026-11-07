@@ -59,6 +59,7 @@ test('cópia JSON vira resposta das abas', () => {
   d.traders.data.t.imageLink = 'prapor.webp';
   assert.equal(findItem(d, ['MRS', 'Transiluminador de pele LEDX']).id, 'l');
   assert.equal(findItem(d, ['LEDX Skin Transi1luminator']).id, 'l');
+  assert.equal(findItem(d, ['Transiluminador de', 'pele LEDX']).id, 'l'); // nome quebrado em duas linhas
   assert.equal(findItem(d, ['Lug', 'MRS']), null);
   const h = hoverInfo(d, findItem(d, ['Transiluminador de pele LEDX']));
   assert.deepEqual([h.name, h.flea, h.trader.name, h.trader.image, h.perSlot, h.quests], ['Transiluminador de pele LEDX', 500000, 'Prapor', 'prapor.webp', 500000, ['Private Clinic']]);
