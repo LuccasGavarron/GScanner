@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { execSync, spawn } from 'node:child_process';
+import { execSync, execFile, spawn } from 'node:child_process';
 import { parseScreenshot, mapFromLogLine, mapKey, raidStartFromLogLine } from './public/shared.js';
 import * as offline from './offline.js';
 import { spectrumDb, toBands, footstepProfile, nearestProfile } from './public/sound.js';
@@ -271,8 +271,33 @@ async function getExtracts() {
   return (extracts = offline.mapLayers(maps, en.data, d, mapKey));
 }
 
+// Atualização automática pelo GitHub: a cada minuto confere; com commit novo e sem mudança local, baixa e
+// reinicia em ~1 s. A página recarrega sozinha quando vê a versão nova (evento "version"). Desliga com "autoUpdate": false.
+const git = (...args) => new Promise(r => execFile('git', args, { cwd: import.meta.dirname }, (e, out) => r(e ? null : out.trim())));
+const VERSION = (() => { try { return execSync('git rev-parse --short HEAD', { cwd: import.meta.dirname, encoding: 'utf8' }).trim(); } catch { return 'dev'; } })();
+let updating = false;
+async function checkUpdate() {
+  if (updating || cfg.autoUpdate === false || (await git('fetch', '-q', 'origin')) === null) return;
+  const [head, up, dirty] = await Promise.all([git('rev-parse', 'HEAD'), git('rev-parse', '@{u}'), git('status', '--porcelain', '--untracked-files=no')]);
+  if (!head || !up || head === up || dirty !== '') return; // nada novo, ou há mudança local: não mexe
+  if ((await git('merge-base', '--is-ancestor', 'HEAD', '@{u}')) === null) return; // históricos divergiram
+  updating = true;
+  if ((await git('pull', '--ff-only', '-q')) === null) { updating = false; return; }
+  console.log('Atualizado pelo GitHub: reiniciando');
+  let started = false;
+  const relaunch = () => {
+    if (started) return;
+    started = true;
+    spawn(process.execPath, [path.join(import.meta.dirname, 'server.js')], { cwd: import.meta.dirname, detached: true, stdio: 'ignore' }).unref();
+    process.exit(0);
+  };
+  for (const res of clients.keys()) res.end(); // fecha os eventos para a porta liberar; as páginas reconectam sozinhas
+  server.close(relaunch);
+  setTimeout(relaunch, 3000);
+}
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   if (req.url === '/api' && req.method === 'POST') return proxy(req, res);
   if (req.url.startsWith('/sound/') && req.method === 'POST') {
     const out = req.url === '/sound/start' ? (soundStart(), { ok: true }) : req.url === '/sound/stop' ? soundStop() : { secs: soundSecs(rec), error: rec?.done ? rec.error.split('\n')[0] : undefined };
@@ -356,6 +381,8 @@ http.createServer((req, res) => {
   console.log(`GScanner: http://localhost:${PORT}` + (lan ? `  |  celular: http://${lan}:${PORT}` : ''));
   console.log('Logs:', LOGS);
   watchShots();
+  publish('version', VERSION);
+  setInterval(checkUpdate, 60_000);
   watchHover();
   // cartão por cima do jogo (Tarkov em janela sem borda); desliga com "overlay": false no config.json
   if (process.platform === 'win32' && cfg.overlay !== false) spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'overlay.ps1'), '-Port', String(PORT), '-ParentPid', String(process.pid)], { stdio: 'ignore' });

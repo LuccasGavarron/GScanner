@@ -1,4 +1,4 @@
-import { $ } from './api.js';
+import { $, onEvent } from './api.js';
 import { initMap, resizeMap } from './map.js';
 import { initAmmo } from './ammo.js';
 import { initBuild } from './build.js';
@@ -22,3 +22,7 @@ initBuild();
 initPrice();
 initSound();
 initMissions();
+
+// servidor atualizou pelo GitHub e reiniciou: recarrega a página para pegar o código novo
+let version;
+onEvent((type, data) => { if (type !== 'version') return; if (version && version !== data) location.reload(); version = data; });
