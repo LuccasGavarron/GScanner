@@ -26,7 +26,8 @@ export function footstepProfile(frames) {
     return sel.length ? toDb(sel.reduce((a, b) => a + pow(b[k]), 0) / sel.length) : -120;
   });
   const ev = avg(l => l > med + 6), bg = avg(l => l <= med);
-  return { events: level.filter(l => l > med + 6).length, diff: BANDS.map((f, k) => ({ f, db: Math.round((ev[k] - bg[k]) * 10) / 10 })) };
+  // bg fica salvo: serve de referência para reconhecer chuva pelo fundo depois
+  return { bg: bg.map(v => Math.round(v * 10) / 10), events: level.filter(l => l > med + 6).length, diff: BANDS.map((f, k) => ({ f, db: Math.round((ev[k] - bg[k]) * 10) / 10 })) };
 }
 
 // Sugestão para o Equalizer APO: realça as 3 bandas de 800 Hz a 6,3 kHz onde os passos mais se destacam.
