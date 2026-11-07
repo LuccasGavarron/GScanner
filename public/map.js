@@ -21,7 +21,7 @@ function crs(m) {
 }
 
 const maps = {};
-let current, leaflet, me, myPing, floorLayer, bounds, extractLayer, squadLayer, extracts = {}, lastPos, raidStart, squadMembers = [], myName;
+let zoomOutside = null, current, leaflet, me, myPing, floorLayer, bounds, extractLayer, squadLayer, extracts = {}, lastPos, raidStart, squadMembers = [], myName;
 export let overlay; // camada livre para outros módulos (missões) desenharem no mapa
 export const mapKeyNow = () => $('#map-select').value;
 const onShow = [];
@@ -188,8 +188,19 @@ function showPosition(p) {
   const meIcon = L.divIcon({ className: '', html: `<div class="me" style="transform: rotate(${p.yaw + add}deg)"></div>`, iconSize: [16, 20] });
   const ll = [p.z, p.x];
   me ? me.setLatLng(ll).setIcon(meIcon) : (me = L.marker(ll, { icon: meIcon, interactive: false }).addTo(leaflet));
-  if ($('#follow').checked) leaflet.panTo(ll);
-  showFloor(floorAt(current.layers, p));
+  const floor = floorAt(current.layers, p);
+  const changed = floor.index !== +$('#floor').value;
+  showFloor(floor.index);
+  if ($('#follow').checked) {
+    // subiu num prédio: aproxima nele; no térreo ou em andar do mapa todo: só acompanha
+    if (changed && floor.rect) {
+      zoomOutside ??= leaflet.getZoom();
+      leaflet.flyToBounds(floor.rect.map(([x, z]) => [z, x]), { padding: [60, 60], maxZoom: current.maxZoom - 0.5, duration: 0.6 });
+    } else if (changed && zoomOutside != null) {
+      leaflet.flyTo(ll, zoomOutside, { duration: 0.6 }); // saiu do prédio: volta ao zoom de antes
+      zoomOutside = null;
+    } else leaflet.panTo(ll);
+  }
   drawExtracts();
 }
 

@@ -7,10 +7,10 @@ test('andar pela altura e pela área', () => {
     { name: '2nd Floor', extents: [{ height: [2.7, 6.5], bounds: [[[243, 190], [165, 125], 'dorms']] }] },
     { name: 'Underground', extents: [{ height: [-1000, -2] }] },
   ];
-  assert.equal(floorAt(layers, { x: 200, y: 3, z: 150 }), 0);
-  assert.equal(floorAt(layers, { x: 0, y: 3, z: 0 }), -1); // altura bate, mas fora do dorm
-  assert.equal(floorAt(layers, { x: 0, y: -5, z: 0 }), 1);
-  assert.equal(floorAt(undefined, { x: 0, y: 0, z: 0 }), -1);
+  assert.deepEqual(floorAt(layers, { x: 200, y: 3, z: 150 }), { index: 0, rect: [[243, 190], [165, 125]] });
+  assert.equal(floorAt(layers, { x: 0, y: 3, z: 0 }).index, -1); // altura bate, mas fora do dorm
+  assert.deepEqual(floorAt(layers, { x: 0, y: -5, z: 0 }), { index: 1, rect: null });
+  assert.equal(floorAt(undefined, { x: 0, y: 0, z: 0 }).index, -1);
 });
 import { optimize } from './public/optimize.js';
 import { BANDS, toBands, footstepProfile, suggestEq, spectrumDb } from './public/sound.js';
