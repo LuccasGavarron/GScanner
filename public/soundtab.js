@@ -8,8 +8,10 @@ async function start() {
   try {
     // systemAudio: o navegador oferece "compartilhar áudio do sistema" ao escolher a tela
     stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, systemAudio: 'include' });
-  } catch {
-    return void ($('#sound-status').textContent = 'Gravação cancelada.');
+  } catch (e) {
+    console.error('getDisplayMedia', e);
+    const why = e.name === 'NotAllowedError' ? 'a janela de escolha foi fechada ou o Chrome bloqueou a captura' : e.message;
+    return void ($('#sound-status').textContent = `Não gravou: ${why} (${e.name}).`);
   }
   if (!stream.getAudioTracks().length) {
     stream.getTracks().forEach(t => t.stop());
