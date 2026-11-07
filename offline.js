@@ -196,7 +196,25 @@ export function hoverInfo(d, i) {
     name: d.itemsPt ? tr(d.itemsPt, i.name) : p.name, flea: p.lastLowPrice,
     trader: top && { name: top.vendor.name, price: top.priceRUB, image: trader?.imageLink, portrait: `https://tarkov.dev/images/traders/${top.vendor.normalizedName}-portrait.png` },
     perSlot: Math.round(best / (i.width * i.height)), quests: p.usedInTasks.map(t => t.name),
+    ...gearInfo(d, i),
   };
+}
+
+// Pente: munições que aceita. Arma: munições e pentes. Ícone em JPG (o overlay do Windows não abre WebP).
+function gearInfo(d, i) {
+  const pr = i.properties;
+  if (!pr || !['ItemPropertiesMagazine', 'ItemPropertiesWeapon'].includes(pr.propertiesType)) return {};
+  const byId = new Map(items(d).map(x => [x.id, x]));
+  const name = x => tr(d.itemsPt ?? d.itemsEn, x.shortName);
+  const icon = id => `https://assets.tarkov.dev/${id}-icon.jpg`;
+  const ammo = (pr.allowedAmmo ?? []).map(id => byId.get(id)).filter(a => a?.properties?.penetrationPower != null)
+    .sort((a, b) => b.properties.penetrationPower - a.properties.penetrationPower).slice(0, 8)
+    .map(a => ({ name: name(a), icon: icon(a.id), pen: a.properties.penetrationPower, dmg: a.properties.damage * (a.properties.projectileCount || 1) }));
+  const magSlot = pr.slots?.find(s => s.nameId === 'mod_magazine');
+  const mags = (magSlot?.filters?.allowedItems ?? []).map(id => byId.get(id)).filter(Boolean)
+    .sort((a, b) => (b.properties?.capacity ?? 0) - (a.properties?.capacity ?? 0)).slice(0, 6)
+    .map(m => ({ name: name(m), icon: icon(m.id), cap: m.properties?.capacity }));
+  return { ammo, mags };
 }
 
 // Descobre a aba pela consulta GraphQL que ela manda.
