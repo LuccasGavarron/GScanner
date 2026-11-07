@@ -6,10 +6,11 @@ import crypto from 'node:crypto';
 import { execSync, spawn } from 'node:child_process';
 import { parseScreenshot, mapFromLogLine, mapKey, raidStartFromLogLine } from './public/shared.js';
 import * as offline from './offline.js';
-import { spectrumDb, toBands, footstepProfile } from './public/sound.js';
+import { spectrumDb, toBands, footstepProfile, nearestProfile } from './public/sound.js';
 
 const PORT = Number(process.env.PORT) || 7777;
 const PUBLIC = path.join(import.meta.dirname, 'public');
+const CACHE = path.join(import.meta.dirname, 'cache');
 
 function reg(key, value) {
   try { return execSync(`reg query "${key}" /v ${value}`, { encoding: 'utf8' }).match(/REG_\w+\s+(.+)/)?.[1].trim(); } catch { return undefined; }
@@ -153,6 +154,45 @@ function soundStop() {
   return { profile: footstepProfile(r.frames), secs: soundSecs(r) };
 }
 
+// Equalizador: perfis (sem chuva / com chuva) vêm da aba Som. O Equalizer APO inclui cache/eq.txt
+// (config.txt dele: "Include: <pasta do GScanner>\cache\eq.txt") e recarrega sozinho quando o arquivo muda.
+const EQ_FILE = path.join(CACHE, 'eq.txt'), EQ_PROFILES = path.join(CACHE, 'eq-profiles.json');
+const eq = { profiles: (() => { try { return JSON.parse(fs.readFileSync(EQ_PROFILES, 'utf8')); } catch { return {}; } })(), auto: false, active: null, mon: null };
+function eqApply(name) {
+  if (eq.active === name || !eq.profiles[name]) return;
+  eq.active = name;
+  fs.mkdirSync(CACHE, { recursive: true });
+  fs.writeFileSync(EQ_FILE, `# GScanner: perfil ${name}\n${eq.profiles[name].eq}\n`);
+  publish('eq', { active: name, auto: eq.auto });
+}
+// Troca automática: grava o som sem parar e, a cada 5 s, compara o fundo (metade mais baixa dos quadros)
+// com o fundo salvo de cada perfil; fica com o mais parecido.
+function eqAuto(on) {
+  eq.auto = on;
+  eq.mon?.kill();
+  eq.mon = null;
+  publish('eq', { active: eq.active, auto: on });
+  if (!on) return;
+  const ps = eq.mon = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'loopback.ps1')]);
+  let rate = 0, bytes = Buffer.alloc(0), pending = new Float32Array(0), frames = [];
+  ps.stdout.on('data', chunk => {
+    bytes = Buffer.concat([bytes, chunk]);
+    if (!rate) { const nl = bytes.indexOf(10); if (nl < 0) return; rate = Number(bytes.subarray(5, nl)); bytes = bytes.subarray(nl + 1); }
+    const n = Math.floor(bytes.length / 4), f = new Float32Array(pending.length + n);
+    f.set(pending);
+    for (let i = 0; i < n; i++) f[pending.length + i] = bytes.readFloatLE(i * 4);
+    bytes = bytes.subarray(n * 4);
+    let at = 0;
+    for (; at + 4096 <= f.length; at += 2048) frames.push(toBands(spectrumDb(f.subarray(at, at + 4096)), rate, 4096));
+    pending = f.slice(at);
+    if (frames.length * 2048 < rate * 5) return;
+    const name = nearestProfile(frames, eq.profiles);
+    frames = [];
+    if (name) eqApply(name);
+  });
+  ps.on('exit', () => { if (eq.mon === ps) setTimeout(() => eq.auto && eqAuto(true), 5000); }); // caiu: tenta de novo
+}
+
 // Logs: mapa da raid. Lê o arquivo novo inteiro, para pegar a raid em andamento, e depois só o que entrar.
 let logFile, offset = 0;
 function pollLogs() {
@@ -180,7 +220,6 @@ function pollLogs() {
 
 // /api: repassa a consulta ao tarkov.dev e guarda cópia em disco para quando a API cair.
 const API = process.env.TARKOV_API ?? 'https://api.tarkov.dev/graphql';
-const CACHE = path.join(import.meta.dirname, 'cache');
 function proxy(req, res) {
   let body = '';
   req.on('data', c => { body += c; if (body.length > 100_000) req.destroy(); });
@@ -266,6 +305,25 @@ http.createServer((req, res) => {
     getExtracts().then(e => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(e)),
       () => res.writeHead(503).end('{}'));
     return;
+  }
+  if (req.url.startsWith('/eq/') && req.method === 'POST') {
+    return readJson(req, 20_000, b => {
+      const ok = () => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
+        active: eq.active, auto: eq.auto, file: EQ_FILE, apo: fs.existsSync('C:\\Program Files\\EqualizerAPO\\config\\config.txt'),
+      }));
+      if (req.url === '/eq/profile') {
+        // só linhas Preamp/Filter entram no arquivo que o Equalizer APO lê (nada de Include, Device etc.)
+        const valid = b && ['normal', 'chuva'].includes(b.name) && Array.isArray(b.bg) && b.bg.length === 20 && b.bg.every(Number.isFinite)
+          && typeof b.eq === 'string' && b.eq.length < 2000 && b.eq.split('\n').every(l => /^(Preamp|Filter): [\w .:-]+$/.test(l));
+        if (!valid) return res.writeHead(400).end();
+        eq.profiles[b.name] = { bg: b.bg, eq: b.eq };
+        fs.mkdirSync(CACHE, { recursive: true });
+        fs.writeFileSync(EQ_PROFILES, JSON.stringify(eq.profiles));
+        if (!eq.active || eq.active === b.name) { eq.active = null; eqApply(b.name); }
+      } else if (req.url === '/eq/auto') eqAuto(!!b?.on);
+      else if (req.url === '/eq/use' && eq.profiles[b?.name]) { eqAuto(false); eqApply(b.name); }
+      ok();
+    });
   }
   if (req.url === '/squad' && req.method === 'POST') { // posição de um amigo
     return readJson(req, 10_000, m => res.writeHead(!m || !keyOk(m.key) ? 403 : squadUpdate(m) ? 200 : 400).end());

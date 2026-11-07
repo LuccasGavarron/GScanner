@@ -24,7 +24,19 @@ async function stop() {
   if (!p) return void ($('#sound-status').textContent = 'Pouco som gravado. Grave uns 30 s andando.');
   p.note = `${p.events} momentos de passo em ${secs} s, gravado em ${new Date().toLocaleString('pt-BR')}.`;
   localStorage.setItem('gs-sound-' + $('#sound-profile').value, JSON.stringify(p));
+  sendProfile($('#sound-profile').value, p);
   render(p);
+}
+
+// Equalizador no servidor (Equalizer APO): perfis, perfil em uso e troca automática com a chuva
+const eqPost = (url, body) => fetch(url, { method: 'POST', body: JSON.stringify(body) }).then(r => r.json()).then(eqShow);
+const sendProfile = (name, p) => p.bg && eqPost('/eq/profile', { name, bg: p.bg, eq: suggestEq(p.diff) });
+function eqShow(s) {
+  if (!s) return;
+  $('#eq-auto').checked = s.auto;
+  const names = { normal: 'Sem chuva', chuva: 'Com chuva' };
+  $('#eq-status').textContent = (s.active ? `Equalizador em uso: ${names[s.active]}.` : 'Nenhum equalizador em uso.')
+    + (s.apo === false ? ' Equalizer APO não instalado: o som ainda não muda.' : '');
 }
 
 // Cada perfil (sem chuva / com chuva) guarda a última medição
@@ -54,4 +66,10 @@ export function initSound() {
   $('#sound-copy').onclick = () => navigator.clipboard.writeText($('#sound-eq').textContent);
   $('#sound-profile').onchange = showSaved;
   showSaved();
+  $('#eq-use').onclick = () => eqPost('/eq/use', { name: $('#sound-profile').value });
+  $('#eq-auto').onchange = e => eqPost('/eq/auto', { on: e.target.checked });
+  // perfis medidos antes ficam só no navegador: manda ao servidor ao abrir
+  for (const name of ['normal', 'chuva']) { const p = JSON.parse(localStorage.getItem('gs-sound-' + name) ?? 'null'); if (p) sendProfile(name, p); }
+  eqPost('/eq/status', {});
+  new EventSource('/events').onmessage = e => { const m = JSON.parse(e.data); if (m.type === 'eq') eqShow({ ...m.data }); };
 }

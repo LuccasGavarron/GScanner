@@ -53,6 +53,18 @@ export function footstepProfile(frames) {
   return { bg: bg.map(v => Math.round(v * 10) / 10), events: level.filter(l => l > med + 6).length, diff: BANDS.map((f, k) => ({ f, db: Math.round((ev[k] - bg[k]) * 10) / 10 })) };
 }
 
+// Qual perfil (sem chuva / com chuva) tem o fundo mais parecido com o som de agora.
+// Fundo = média da metade mais baixa dos quadros; compara só de 1 kHz para cima, onde a chuva chia.
+export function nearestProfile(frames, profiles) {
+  const named = Object.entries(profiles).filter(([, p]) => p.bg?.length === BANDS.length);
+  if (named.length < 2 || frames.length < 10) return null;
+  const level = frames.map(b => b.reduce((a, x) => a + pow(x), 0));
+  const quiet = frames.filter((_, i) => level[i] <= [...level].sort((a, b) => a - b)[Math.floor(level.length / 2)]);
+  const bg = BANDS.map((_, k) => toDb(quiet.reduce((a, b) => a + pow(b[k]), 0) / quiet.length));
+  const dist = p => BANDS.reduce((a, f, k) => a + (f >= 1000 ? Math.abs(bg[k] - p.bg[k]) : 0), 0);
+  return named.sort((a, b) => dist(a[1]) - dist(b[1]))[0][0];
+}
+
 // Sugestão para o Equalizer APO: realça as 3 bandas de 800 Hz a 6,3 kHz onde os passos mais se destacam.
 export function suggestEq(diff) {
   const top = diff.filter(d => d.f >= 800 && d.f <= 6300 && d.db > 0).sort((a, b) => b.db - a.db).slice(0, 3);

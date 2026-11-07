@@ -13,7 +13,16 @@ test('andar pela altura e pela área', () => {
   assert.equal(floorAt(undefined, { x: 0, y: 0, z: 0 }).index, -1);
 });
 import { optimize } from './public/optimize.js';
-import { BANDS, toBands, footstepProfile, suggestEq, spectrumDb } from './public/sound.js';
+import { BANDS, toBands, footstepProfile, suggestEq, spectrumDb, nearestProfile } from './public/sound.js';
+
+test('reconhece chuva pelo fundo', () => {
+  const dry = BANDS.map(() => -70), rain = BANDS.map(f => (f >= 2000 ? -45 : -68)); // chuva = chiado nos agudos
+  const profiles = { normal: { bg: dry }, chuva: { bg: rain } };
+  const now = bg => Array.from({ length: 40 }, (_, i) => (i % 8 ? bg : bg.map(v => v + 20))); // fundo + alguns passos
+  assert.equal(nearestProfile(now(rain.map(v => v + 1)), profiles), 'chuva');
+  assert.equal(nearestProfile(now(dry), profiles), 'normal');
+  assert.equal(nearestProfile(now(dry), { normal: profiles.normal }), null); // precisa dos dois perfis
+});
 
 test('FFT acha o tom certo', () => {
   const rate = 48000, n = 4096, f = 3000;
