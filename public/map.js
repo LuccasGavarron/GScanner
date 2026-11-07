@@ -28,6 +28,7 @@ const onShow = [];
 export const onMapShown = f => onShow.push(f);
 
 const EX_COLOR = { pmc: '#4c4', scav: '#4af', shared: '#c6f', transit: '#fa3' };
+const EX_NAME = { pmc: 'Extração PMC', scav: 'Extração Scav', shared: 'Extração em grupo (co-op)', transit: 'Transição para outro mapa' };
 const EX_SHOW = { pmc: ['pmc', 'shared', 'transit'], scav: ['scav', 'shared', 'transit'], all: Object.keys(EX_COLOR), none: [] };
 // shortcut: 5 m/s é a média andando e correndo; o tempo real muda com peso e stamina
 const SPEED = 5;
@@ -41,9 +42,54 @@ function drawExtracts() {
     if (!show.includes(e.faction)) continue;
     const dist = lastPos && Math.hypot(e.x - lastPos.x, e.z - lastPos.z);
     const label = dist ? `${e.name} · ${Math.round(dist)} m · ${mmss(dist / SPEED)}` : e.name;
-    L.circleMarker([e.z, e.x], { radius: 6, color: '#000', weight: 1, fillColor: EX_COLOR[e.faction], fillOpacity: 1, interactive: false })
+    const m = L.circleMarker([e.z, e.x], { radius: 7, color: '#000', weight: 1, fillColor: EX_COLOR[e.faction], fillOpacity: 1 })
       .bindTooltip(label, { permanent: true, direction: 'right', className: 'ex-label' }).addTo(extractLayer);
+    detail(m, `<b>${e.name}</b><br>${EX_NAME[e.faction]}${e.needsSwitch ? '<br>⚡ Precisa acionar uma alavanca antes' : ''}${dist ? `<br>${Math.round(dist)} m · uns ${mmss(dist / SPEED)} até lá` : ''}`);
   }
+}
+
+// Detalhe ao passar o mouse: um popup sem botão que some ao sair
+function detail(layer, html) {
+  layer.on('mouseover', e => L.popup({ closeButton: false, autoPan: false, className: 'detail', offset: [0, -6] }).setLatLng(e.latlng).setContent(html).openOn(leaflet));
+  layer.on('mouseout', () => leaflet.closePopup());
+}
+const pct = v => Math.round(v * 100) + '%';
+const img = (src, cls = '') => (src ? `<img src="${src}" class="${cls}">` : '');
+
+// Camadas extras do mapa; o controle do Leaflet liga e desliga cada uma
+const layerOn = JSON.parse(localStorage.getItem('gs-layers') ?? '{"Bosses":true,"Chaves":true,"Perigos":true}');
+function buildLayers(key) {
+  const d = extracts[key];
+  if (!d) return;
+  const dot = (p, color, r = 4) => L.circleMarker([p.z, p.x], { radius: r, color: '#000', weight: 1, fillColor: color, fillOpacity: 0.9 });
+  const groups = {
+    Bosses: d.bosses.map(b => {
+      const m = L.marker([b.z, b.x], { icon: L.divIcon({ className: '', html: `<div class="boss">${img(b.portrait)}</div>`, iconSize: [30, 30] }) });
+      detail(m, `<div class="row">${img(b.portrait, 'big')}<div><b>${b.name}</b><br>Chance no mapa: ${pct(b.chance)}<br>Neste local (${b.zone}): ${pct(b.zoneChance)}</div></div>`);
+      return m;
+    }),
+    Chaves: d.locks.map(l => {
+      const m = dot(l, '#fd3', 5);
+      detail(m, `<div class="row">${img(l.icon)}<div><b>Porta trancada</b><br>${l.key}${l.price ? `<br>Flea: ${l.price.toLocaleString('pt-BR')} ₽` : ''}${l.needsPower ? '<br>⚡ Precisa de energia' : ''}</div></div>`);
+      return m;
+    }),
+    Perigos: d.hazards.map(h => {
+      const p = L.polygon(h.outline.map(o => [o.z, o.x]), { color: '#f33', weight: 1, fillOpacity: 0.25 });
+      detail(p, `<b>${h.name === 'Landmine' ? 'Campo minado' : h.name}</b>`);
+      return p;
+    }),
+    Containers: d.containers.map(c => { const m = dot(c, '#bbb', 3); detail(m, c.name); return m; }),
+    Alavancas: d.switches.map(s => { const m = dot(s, '#f80', 5); detail(m, '<b>Alavanca</b><br>Abre extração ou porta'); return m; }),
+    'Armas fixas': d.weapons.map(w => { const m = dot(w, '#e44', 5); detail(m, `<b>${w.name}</b>`); return m; }),
+    Spawns: d.spawns.map(s => { const m = dot(s, s.sides.includes('scav') && !s.sides.includes('pmc') ? '#4af' : '#4c4', 3); detail(m, `Spawn: ${s.sides.join(', ')}`); return m; }),
+  };
+  const overlays = {};
+  for (const [name, list] of Object.entries(groups)) {
+    overlays[name] = L.layerGroup(list);
+    if (layerOn[name]) overlays[name].addTo(leaflet);
+  }
+  L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(leaflet);
+  leaflet.on('overlayadd overlayremove', e => { layerOn[e.name] = e.type === 'overlayadd'; localStorage.setItem('gs-layers', JSON.stringify(layerOn)); });
 }
 
 function drawSquad() {
@@ -95,7 +141,7 @@ function showMap(key) {
   $('#floor').innerHTML = '<option value="-1">Térreo</option>' + m.layers.map((l, i) => `<option value="${i}">${l.name}</option>`).join('');
   floorLayer = null;
   // wheelPxPerZoomLevel alto = rodinha menos sensível (padrão do Leaflet é 60)
-  leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 200, attributionControl: false });
+  leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 200, attributionControl: false, preferCanvas: true });
   L.tileLayer(m.tilePath, { tileSize: m.tileSize || 256, bounds }).addTo(leaflet);
   leaflet.fitBounds(bounds);
   const places = L.layerGroup().addTo(leaflet);
@@ -105,6 +151,7 @@ function showMap(key) {
   extractLayer = L.layerGroup().addTo(leaflet);
   overlay = L.layerGroup().addTo(leaflet);
   squadLayer = L.layerGroup().addTo(leaflet);
+  buildLayers(key);
   drawExtracts();
   drawSquad();
   me = myPing = null;
@@ -136,7 +183,7 @@ export async function initMap() {
 
   const [mapData, ex] = await Promise.all([
     fetch(MAPS_URL).then(r => r.json()).catch(() => []),
-    fetch('/extracts').then(r => r.json()).catch(() => ({})),
+    fetch('/mapdata').then(r => r.json()).catch(() => ({})),
   ]);
   extracts = ex;
   if (!mapData.length) $('#map-status').textContent = 'Não consegui baixar os mapas do tarkov.dev.';

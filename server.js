@@ -227,17 +227,8 @@ const offlineData = () => (offlineCache ??= Promise.all(['items', 'items_en', 'i
 let extracts;
 async function getExtracts() {
   if (extracts) return extracts;
-  const [maps, en] = await Promise.all([cachedGet('maps'), cachedGet('maps_en')]);
-  const out = {};
-  for (const m of Object.values(maps.data.maps)) {
-    const key = mapKey(m.nameId);
-    if (out[key]) continue; // variantes (noite, lab escuro) usam o mesmo mapa
-    out[key] = { duration: m.raidDuration, points: [
-      ...m.extracts.map(e => ({ name: en.data[e.name] ?? e.name, faction: e.faction, x: e.position.x, z: e.position.z })),
-      ...m.transits.map(t => ({ name: en.data[t.description] ?? 'Transit', faction: 'transit', x: t.position.x, z: t.position.z })),
-    ] };
-  }
-  return (extracts = out);
+  const [maps, en, d] = await Promise.all([cachedGet('maps'), cachedGet('maps_en'), offlineData().catch(() => null)]);
+  return (extracts = offline.mapLayers(maps, en.data, d, mapKey));
 }
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
@@ -247,7 +238,7 @@ http.createServer((req, res) => {
     const out = req.url === '/sound/start' ? (soundStart(), { ok: true }) : req.url === '/sound/stop' ? soundStop() : { secs: soundSecs(rec), error: rec?.done ? rec.error.split('\n')[0] : undefined };
     return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
   }
-  if (req.url === '/extracts') {
+  if (req.url === '/mapdata') {
     getExtracts().then(e => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(e)),
       () => res.writeHead(503).end('{}'));
     return;

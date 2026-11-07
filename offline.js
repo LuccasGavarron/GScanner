@@ -61,6 +61,42 @@ export function price(d, q, only) {
     });
 }
 
+// ---------- Mapa: tudo o que dá para mostrar em cada mapa, com os detalhes do hover ----------
+// maps/en: json.tarkov.dev/regular/maps e maps_en; d: dados de itens (para nome, ícone e preço das chaves), pode faltar.
+export function mapLayers(maps, en, d, mapKey) {
+  const t = k => en[k] ?? k;
+  const pos = p => ({ x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 });
+  const itemById = d && new Map(items(d).map(i => [i.id, i]));
+  const out = {};
+  for (const m of Object.values(maps.data.maps)) {
+    const key = mapKey(m.nameId);
+    if (out[key]) continue; // variantes (noite, lab escuro) usam o mesmo mapa
+    out[key] = {
+      duration: m.raidDuration,
+      points: [
+        ...m.extracts.map(e => ({ name: t(e.name), faction: e.faction, needsSwitch: !!e.switch, ...pos(e.position) })),
+        ...m.transits.map(x => ({ name: t(x.description), faction: 'transit', ...pos(x.position) })),
+      ],
+      locks: m.locks.map(l => {
+        const k = itemById?.get(l.key);
+        return { key: k ? tr(d.itemsPt ?? d.itemsEn, k.name) : 'Chave', icon: k?.iconLink, price: k ? fleaPrice(k) || null : null, needsPower: l.needsPower, ...pos(l.position) };
+      }),
+      hazards: m.hazards.map(h => ({ name: t(h.name), outline: h.outline.map(pos) })),
+      bosses: m.bosses.filter(b => b.spawnChance > 0).flatMap(b => {
+        const mob = maps.data.mobs[b.mob];
+        return b.spawnLocations.flatMap(l => l.positions.map(p => ({
+          name: t(mob?.name ?? b.mob), portrait: mob?.imagePortraitLink, chance: b.spawnChance, zone: t(l.name), zoneChance: l.chance, ...pos(p),
+        })));
+      }),
+      switches: m.switches.map(s => pos(s.position)),
+      containers: m.lootContainers.map(c => ({ name: t(maps.data.lootContainers[c.lootContainer]?.name), ...pos(c.position) })),
+      weapons: m.stationaryWeapons.map(w => ({ name: t(maps.data.stationaryWeapons[w.stationaryWeapon]?.name), ...pos(w.position) })),
+      spawns: m.spawns.filter(s => s.categories.includes('player')).map(s => ({ sides: s.sides, ...pos(s.position) })),
+    };
+  }
+  return out;
+}
+
 // ---------- Hover: nome lido pelo OCR -> item ----------
 const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
