@@ -1,4 +1,5 @@
 import { $ } from './api.js';
+import { floorAt } from './shared.js';
 
 const MAPS_URL = 'https://raw.githubusercontent.com/the-hideout/tarkov-dev/main/src/data/maps.json';
 
@@ -20,8 +21,18 @@ function crs(m) {
 }
 
 const maps = {};
-let current, leaflet, me, pings;
+let current, leaflet, me, pings, floorLayer, bounds;
 export const resizeMap = () => leaflet?.invalidateSize();
+
+// Andar por cima do térreo; -1 = só o térreo
+function showFloor(i) {
+  if (i === +$('#floor').value) return; // evita piscar ao repetir o mesmo andar
+  $('#floor').value = i;
+  floorLayer?.remove();
+  floorLayer = null;
+  const l = current.layers?.[i];
+  if (l) floorLayer = L.tileLayer(l.tilePath, { tileSize: current.tileSize || 256, bounds }).addTo(leaflet);
+}
 
 function showMap(key) {
   const m = maps[key];
@@ -30,7 +41,10 @@ function showMap(key) {
   $('#map-select').value = key;
   leaflet?.remove();
   const b = m.bounds;
-  const bounds = L.latLngBounds([b[0][1], b[0][0]], [b[1][1], b[1][0]]);
+  bounds = L.latLngBounds([b[0][1], b[0][0]], [b[1][1], b[1][0]]);
+  m.layers = (m.layers ?? []).filter(l => l.tilePath);
+  $('#floor').innerHTML = '<option value="-1">Térreo</option>' + m.layers.map((l, i) => `<option value="${i}">${l.name}</option>`).join('');
+  floorLayer = null;
   leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, attributionControl: false });
   L.tileLayer(m.tilePath, { tileSize: m.tileSize || 256, bounds }).addTo(leaflet);
   leaflet.fitBounds(bounds);
@@ -49,12 +63,14 @@ function showPosition(p) {
   const ll = [p.z, p.x];
   me ? me.setLatLng(ll).setIcon(icon) : (me = L.marker(ll, { icon, interactive: false }).addTo(leaflet));
   leaflet.panTo(ll);
+  showFloor(floorAt(current.layers, p));
   $('#map-status').textContent = `Você: x ${p.x.toFixed(0)}, z ${p.z.toFixed(0)}, altura ${p.y.toFixed(1)}`;
 }
 
 export async function initMap() {
   $('#map-select').onchange = e => showMap(e.target.value);
   $('#clear-pings').onclick = () => pings?.clearLayers();
+  $('#floor').onchange = e => showFloor(+e.target.value);
 
   const mapData = await fetch(MAPS_URL).then(r => r.json()).catch(() => []);
   if (!mapData.length) $('#map-status').textContent = 'Não consegui baixar os mapas do tarkov.dev.';

@@ -27,6 +27,13 @@ const MAP_IDS = {
 };
 export const mapKey = id => MAP_IDS[id.toLowerCase()] ?? id.toLowerCase();
 
+// Índice do andar (layers do maps.json do tarkov.dev) onde está a posição, ou -1 para o térreo.
+// extents: [{ height: [min, max], bounds: [[[x1, z1], [x2, z2], nome], ...] }]; sem bounds vale o mapa todo.
+export function floorAt(layers, { x, y, z }) {
+  const inside = ([[x1, z1], [x2, z2]]) => x >= Math.min(x1, x2) && x <= Math.max(x1, x2) && z >= Math.min(z1, z2) && z <= Math.max(z1, z2);
+  return (layers ?? []).findIndex(l => l.extents?.some(e => y >= e.height[0] && y < e.height[1] && (!e.bounds || e.bounds.some(inside))));
+}
+
 // shortcut: regra simples pen x classe*10; trocar por chance real de penetração quando houver dados de durabilidade.
 export function armorGrade(pen, armorClass) {
   const d = pen - armorClass * 10;
