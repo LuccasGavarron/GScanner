@@ -72,7 +72,8 @@ test('cópia JSON vira resposta das abas', () => {
   assert.equal(findItem(d, ['Lug', 'MRS']), null);
   // só texto colado ao cursor conta para a dica; "Gravado" do slot especial (longe) fica de fora
   assert.deepEqual(nearCursor([['Gravado', 58, -284, 124, -272], ['Transiluminador de pele LEDX', 38, -67, 300, -49]]).map(b => b[0]), ['Transiluminador de pele LEDX']);
-  assert.deepEqual(nearCursor([['PACA', 18, -77, 57, -63]]), []); // rótulo da grade (14 px) perto do cursor não é dica
+  assert.deepEqual(nearCursor([['PACA', 18, -77, 57, -63]]), []); // rótulo da grade perto do cursor não é dica
+  assert.deepEqual(nearCursor([['76/81', -23, -92, 20, -80], ['Furadeira Polonesa', 37, -46, 203, -31]]).map(b => b[0]), ['Furadeira Polonesa']); // caso real do log
   assert.equal(findItem(d, ['Transiluminador de pele LEDY']).id, 'l'); // nome longo: aceita 1 letra errada
   assert.equal(findItem(d, ['Lugar']), null); // nome curto: só exato (não vira "Luger")
   // raid: nome curto abaixo da mira, o mais perto do centro; "PEGAR" e lixo não contam

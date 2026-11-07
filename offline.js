@@ -189,8 +189,10 @@ export function findItem(d, lines) {
 
 // Só o texto colado ao cursor: a dica do jogo nasce ali (à direita, um pouco acima). Fora dessa área há rótulos
 // da tela ("SLOT ESPECIAL", "Gravado") que viravam item errado na busca aproximada.
-// Letra da dica tem 17-18 px de altura; os rótulos da grade, 12-14 px: só texto com 16 px ou mais conta como dica.
-export const nearCursor = boxes => boxes.filter(b => Array.isArray(b) && b[1] >= -20 && b[1] <= 160 && b[2] >= -140 && b[2] <= 60 && b[4] - b[2] >= 16);
+// A dica do jogo nasce sempre a ~37 px à direita do cursor (36-38 px medidos no log); perto da borda direita da tela
+// ela vai para a esquerda, terminando ~37 px antes do cursor. Rótulos da grade não caem nessa faixa.
+export const nearCursor = boxes => boxes.filter(b => Array.isArray(b) && b[2] >= -160 && b[2] <= 60 && b[4] - b[2] >= 12
+  && ((b[1] >= 25 && b[1] <= 55) || (b[3] >= -55 && b[3] <= -20)));
 
 // Índice de nomes curtos ("T-45M1", "Berkut"), usado pela leitura da mira em raid.
 const shortIndexes = new WeakMap();
