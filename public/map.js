@@ -20,7 +20,8 @@ function crs(m) {
   });
 }
 
-const maps = {};
+const maps = {}, statics = {};
+let style = localStorage.getItem('gs-style') ?? 'sat', svgEl;
 let zoomOutside = null, current, leaflet, me, myPing, floorLayer, bounds, extractLayer, squadLayer, extracts = {}, lastPos, raidStart, squadMembers = [], myName;
 export let overlay; // camada livre para outros módulos (missões) desenharem no mapa
 export const mapKeyNow = () => $('#map-select').value;
@@ -132,11 +133,22 @@ function tick() {
 export const resizeMap = () => leaflet?.invalidateSize();
 
 // Andar por cima do térreo; -1 = só o térreo
+// Estratégico: mostra o térreo e o andar escolhido, esconde os outros andares do SVG
+function svgFloor() {
+  if (!svgEl) return;
+  const on = current.layers?.[+$('#floor').value]?.svgLayer;
+  for (const l of current.layers ?? []) {
+    const g = l.svgLayer && svgEl.querySelector('#' + l.svgLayer);
+    if (g) g.style.display = l.svgLayer === on ? '' : 'none';
+  }
+}
+
 function showFloor(i) {
   if (i === +$('#floor').value) return; // evita piscar ao repetir o mesmo andar
   $('#floor').value = i;
   floorLayer?.remove();
   floorLayer = null;
+  if (svgEl) return svgFloor();
   const l = current.layers?.[i];
   if (l) floorLayer = L.tileLayer(local(l.tilePath), { tileSize: current.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
 }
@@ -157,13 +169,29 @@ function showMap(key) {
   const b = m.bounds;
   bounds = L.latLngBounds([b[0][1], b[0][0]], [b[1][1], b[1][0]]);
   m.layers = (m.layers ?? []).filter(l => l.tilePath);
+  $('#map-style').innerHTML = '<option value="sat">Satélite</option>' + (m.svgPath ? '<option value="svg">Estratégico</option>' : '')
+    + (statics[key] ?? []).map(v => `<option value="${v}">${(v.match(/[23]d.*$/)?.[0] ?? v).toUpperCase()} (ilustração)</option>`).join('');
+  if (style === 'svg' && !m.svgPath) style = 'sat';
+  $('#map-style').value = style;
   $('#floor').innerHTML = '<option value="-1">Térreo</option>' + m.layers.map((l, i) => `<option value="${i}">${l.name}</option>`).join('');
   floorLayer = null;
   // wheelPxPerZoomLevel alto = rodinha menos sensível (padrão do Leaflet é 60)
   leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 200, attributionControl: false, preferCanvas: true });
-  L.tileLayer(local(m.tilePath), { tileSize: m.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
+  svgEl = null;
+  if (style === 'svg' && m.svgPath) {
+    // Estratégico: mapa vetorial cinza do tarkov.dev, mesmas coordenadas do satélite
+    fetch(local(m.svgPath)).then(r => r.text()).then(text => {
+      if (current !== m) return;
+      svgEl = new DOMParser().parseFromString(text, 'image/svg+xml').documentElement;
+      const sb = m.svgBounds;
+      L.svgOverlay(svgEl, sb ? L.latLngBounds([sb[0][1], sb[0][0]], [sb[1][1], sb[1][0]]) : bounds).addTo(leaflet).bringToBack();
+      svgFloor();
+    });
+  } else {
+    L.tileLayer(local(m.tilePath), { tileSize: m.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
+    warm(m, local(m.tilePath));
+  }
   leaflet.fitBounds(bounds);
-  warm(m, local(m.tilePath));
   const places = L.layerGroup().addTo(leaflet);
   for (const l of m.labels ?? []) {
     L.marker([l.position[1], l.position[0]], { icon: L.divIcon({ className: '', html: `<span class="place">${l.text}</span>`, iconSize: null }), interactive: false }).addTo(places);
@@ -204,7 +232,30 @@ function showPosition(p) {
   drawExtracts();
 }
 
+// 2D/3D: ilustração do tarkov.dev, sem coordenadas (sem posição nem camadas)
+function showStatic(variant) {
+  leaflet?.remove();
+  current = null;
+  leaflet = L.map('map', { crs: L.CRS.Simple, minZoom: -4, zoomSnap: 0.25, wheelPxPerZoomLevel: 200, attributionControl: false });
+  const img = new Image();
+  img.onload = () => {
+    const b = [[0, 0], [img.height, img.width]];
+    L.imageOverlay(img.src, b).addTo(leaflet);
+    leaflet.fitBounds(b);
+  };
+  img.src = `https://tarkov.dev/maps/${variant}.jpg`;
+}
+
 export async function initMap() {
+  $('#map-style').onchange = e => {
+    const key = $('#map-select').value;
+    if (['sat', 'svg'].includes(e.target.value)) {
+      style = e.target.value;
+      localStorage.setItem('gs-style', style);
+      current = null;
+      showMap(key);
+    } else showStatic(e.target.value);
+  };
   $('#map-select').onchange = e => showMap(e.target.value);
   $('#clear-pings').onclick = () => setPing(null);
   $('#floor').onchange = e => showFloor(+e.target.value);
@@ -221,6 +272,7 @@ export async function initMap() {
   for (const group of mapData) {
     const m = group.maps.find(x => x.projection === 'interactive');
     if (m) maps[group.normalizedName] = m;
+    if (m) statics[group.normalizedName] = group.maps.filter(x => x.projection !== 'interactive').map(x => x.key);
   }
   $('#map-select').innerHTML = Object.keys(maps).map(k => `<option value="${k}">${k}</option>`).join('');
   showMap('customs');
