@@ -51,7 +51,7 @@ async function warm(m, template) {
 }
 
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const icon = (cls, html = '') => L.divIcon({ className: '', html: `<div class="${cls}">${html}</div>`, iconSize: [18, 18] });
+const icon = (cls, html = '') => L.divIcon({ className: '', html: `<div class="${cls}">${html}</div>`, iconSize: [16, 16] });
 
 function drawExtracts() {
   extractLayer.clearLayers();
@@ -144,6 +144,7 @@ function showFloor(i) {
 function setPing(latlng) {
   myPing?.remove();
   myPing = latlng && L.marker(latlng, { icon: icon('ping') }).on('click', () => setPing(null)).addTo(leaflet);
+  if (myPing && lastPos) myPing.bindTooltip(`${Math.round(Math.hypot(latlng.lng - lastPos.x, latlng.lat - lastPos.z))} m`, { permanent: true, direction: 'top', offset: [0, -8], className: 'ex-label' });
   fetch('/ping', { method: 'POST', body: JSON.stringify(latlng ? { x: latlng.lng, z: latlng.lat } : {}) });
 }
 

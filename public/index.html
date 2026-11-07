@@ -19,9 +19,13 @@
   #map { flex: 1; background: #000; }
   .bar { padding: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .me { width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 20px solid #3cf; transform-origin: 50% 60%; }
-  .ping { width: 14px; height: 14px; border-radius: 50%; background: #f53; border: 2px solid #fff; }
+  .ping { --c: #f53; position: relative; width: 12px; height: 12px; border-radius: 50%; background: var(--c); border: 2px solid #fff; box-shadow: 0 0 10px var(--c); }
+  .ping::before, .ping::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--c); animation: pulse 1.6s ease-out infinite; }
+  .ping::after { animation-delay: .8s; }
+  @keyframes pulse { from { transform: scale(1); opacity: 1; } to { transform: scale(4.5); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .ping::before, .ping::after { animation: none; } }
   .mate { width: 14px; height: 14px; border-radius: 50%; background: #39f; border: 2px solid #fff; }
-  .mate-ping { background: #39f; border-style: dashed; }
+  .mate-ping { --c: #39f; }
   .place { display: inline-block; color: rgba(255, 255, 255, .55); font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px #000; transform: translate(-50%, -50%); }
   #raid-timer { color: #fd6; }
   .boss img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #f53; background: #000; }
