@@ -1,6 +1,7 @@
 import { $ } from './api.js';
 import { initMap, resizeMap } from './map.js';
 import { initAmmo } from './ammo.js';
+import { initBuild } from './build.js';
 
 // Abas
 for (const b of document.querySelectorAll('nav button')) {
@@ -14,3 +15,4 @@ for (const b of document.querySelectorAll('nav button')) {
 
 initMap();
 initAmmo();
+initBuild();

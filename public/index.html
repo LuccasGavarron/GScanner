@@ -11,7 +11,9 @@
   nav { display: flex; gap: 4px; padding: 6px; background: #1b1b1b; align-items: center; flex-wrap: wrap; }
   nav button { background: #2a2a2a; color: #ddd; border: 0; padding: 6px 12px; cursor: pointer; }
   nav button.on { background: #9a8866; color: #111; }
-  select { background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 4px; }
+  select, input { background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 4px; }
+  #budget { width: 110px; }
+  .bar button { background: #9a8866; color: #111; border: 0; padding: 5px 12px; cursor: pointer; }
   .tab { flex: 1; display: none; overflow: auto; }
   .tab.on { display: flex; flex-direction: column; }
   #map { flex: 1; background: #000; }
@@ -21,7 +23,7 @@
   table { border-collapse: collapse; margin: 6px; }
   th, td { padding: 4px 8px; border-bottom: 1px solid #2a2a2a; text-align: right; }
   th { position: sticky; top: 0; background: #1b1b1b; cursor: pointer; }
-  td:first-child, th:first-child { text-align: left; }
+  td:first-child, th:first-child, #build-out td:nth-child(2), #build-out th:nth-child(2) { text-align: left; }
   .g0 { background: #5a1d1d; } .g1 { background: #6a4a1a; } .g2 { background: #5d6a1a; } .g3 { background: #1f5a2a; }
   .muted { color: #888; }
 </style>
@@ -31,6 +33,7 @@
   <b style="padding: 0 8px">GScanner</b>
   <button data-tab="tab-map" class="on">Mapa</button>
   <button data-tab="tab-ammo">Munição</button>
+  <button data-tab="tab-build">Armas</button>
 </nav>
 
 <section id="tab-map" class="tab on">
@@ -48,6 +51,28 @@
     <span class="muted" id="ammo-status">Carregando munições...</span>
   </div>
   <table id="ammo"></table>
+</section>
+
+<section id="tab-build" class="tab">
+  <div class="bar">
+    <select id="gun"></select>
+    <label>Orçamento <input id="budget" type="number" min="0" step="1000" placeholder="sem limite"></label>
+    <select id="mode">
+      <option value="recoil">Menos recuo</option>
+      <option value="ergo">Mais ergonomia</option>
+      <option value="balanced">Equilibrado</option>
+    </select>
+    <select id="level">
+      <option value="1">Traders nível 1</option>
+      <option value="2">Traders nível 2</option>
+      <option value="3">Traders nível 3</option>
+      <option value="4" selected>Traders nível 4</option>
+    </select>
+    <label><input id="flea" type="checkbox" checked> Flea</label>
+    <button id="build-go">Montar</button>
+    <span class="muted" id="build-status">Carregando armas e peças...</span>
+  </div>
+  <div id="build-out" style="padding: 0 6px"></div>
 </section>
 
 <script type="module" src="app.js"></script>
