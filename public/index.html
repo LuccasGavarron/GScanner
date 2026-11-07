@@ -26,6 +26,8 @@
   td:first-child, th:first-child, #build-out td:nth-child(2), #build-out th:nth-child(2) { text-align: left; }
   .g0 { background: #5a1d1d; } .g1 { background: #6a4a1a; } .g2 { background: #5d6a1a; } .g3 { background: #1f5a2a; }
   .muted { color: #888; }
+  .best { color: #7d7; font-weight: bold; }
+  #price-q { width: 260px; }
 </style>
 </head>
 <body>
@@ -33,6 +35,7 @@
   <b style="padding: 0 8px">GScanner</b>
   <button data-tab="tab-map" class="on">Mapa</button>
   <button data-tab="tab-ammo">Munição</button>
+  <button data-tab="tab-price">Preço</button>
   <button data-tab="tab-build">Armas</button>
 </nav>
 
@@ -51,6 +54,14 @@
     <span class="muted" id="ammo-status">Carregando munições...</span>
   </div>
   <table id="ammo"></table>
+</section>
+
+<section id="tab-price" class="tab">
+  <div class="bar">
+    <input id="price-q" placeholder="Nome do item, ex.: LEDX" autocomplete="off">
+    <span class="muted" id="price-status">Verde: onde vende melhor. ⚠: guarde, serve para quest.</span>
+  </div>
+  <table id="price"></table>
 </section>
 
 <section id="tab-build" class="tab">
