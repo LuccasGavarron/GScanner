@@ -93,6 +93,21 @@ export function mapLayers(maps, en, d, mapKey) {
       weapons: m.stationaryWeapons.map(w => ({ name: t(maps.data.stationaryWeapons[w.stationaryWeapon]?.name), ...pos(w.position) })),
       spawns: m.spawns.filter(s => s.categories.includes('player')).map(s => ({ sides: s.sides, ...pos(s.position) })),
     };
+    // Loot solto: cada ponto aponta para itens de uma lista única por mapa (economiza tamanho)
+    if (itemById) {
+      const list = [], at = new Map();
+      out[key].loot = (m.lootLoose ?? []).map(l => ({
+        ...pos(l.position),
+        i: l.items.filter(id => itemById.has(id)).map(id => {
+          if (!at.has(id)) {
+            const it = itemById.get(id);
+            at.set(id, list.push({ id, name: tr(d.itemsPt ?? d.itemsEn, it.name), icon: it.iconLink, price: fleaPrice(it) || 0 }) - 1);
+          }
+          return at.get(id);
+        }),
+      }));
+      out[key].lootItems = list;
+    }
   }
   return out;
 }

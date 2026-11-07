@@ -76,6 +76,22 @@ const pct = v => Math.round(v * 100) + '%';
 const img = (src, cls = '') => (src ? `<img src="${src}" class="${cls}">` : '');
 
 // Camadas extras do mapa; o controle do Leaflet liga e desliga cada uma
+// Estimativa de onde os outros jogadores podem estar, por fase da raid. É estatística, não rastreio:
+// o jogo não informa isso. Começo: perto dos spawns de PMC; meio: onde há loot valioso; fim: nas extrações PMC.
+const estimateLayer = L.layerGroup();
+function drawEstimate() {
+  estimateLayer.clearLayers();
+  const d = extracts[mapKeyNow()];
+  if (!d || !leaflet?.hasLayer(estimateLayer)) return;
+  const dur = (d.duration ?? 40) * 60, t = raidStart ? (Date.now() - raidStart) / 1000 : -1;
+  if (t < 0 || t > dur) return; // sem raid em andamento
+  const heat = (list, radius, alpha) => list.forEach(p =>
+    L.circle([p.z, p.x], { radius, stroke: false, fillColor: '#f80', fillOpacity: alpha, interactive: false }).addTo(estimateLayer));
+  if (t < 180) heat(d.spawns.filter(s => s.sides.includes('pmc')), 30 + t * 0.7, 0.05);
+  else if (t < dur * 0.6) heat((d.loot ?? []).filter(l => l.i.some(k => d.lootItems[k].price >= 40000)), 45, 0.05);
+  else heat(d.points.filter(e => e.faction === 'pmc'), 70, 0.25);
+}
+
 const layerOn = JSON.parse(localStorage.getItem('gs-layers') ?? '{"Bosses":true,"Chaves":true,"Perigos":true}');
 function buildLayers(key) {
   const d = extracts[key];
@@ -100,7 +116,13 @@ function buildLayers(key) {
     Containers: d.containers.map(c => { const m = dot(c, '#bbb', 3); detail(m, c.name); return m; }),
     Alavancas: d.switches.map(s => { const m = dot(s, '#f80', 5); detail(m, '<b>Alavanca</b><br>Abre extração ou porta'); return m; }),
     'Armas fixas': d.weapons.map(w => { const m = dot(w, '#e44', 5); detail(m, `<b>${w.name}</b>`); return m; }),
-    Spawns: d.spawns.map(s => { const m = dot(s, s.sides.includes('scav') && !s.sides.includes('pmc') ? '#4af' : '#4c4', 3); detail(m, `Spawn: ${s.sides.join(', ')}`); return m; }),
+    'Spawns de jogadores': d.spawns.map(s => { const pmc = s.sides.includes('pmc') || s.sides.includes('all'); const m = dot(s, pmc ? '#4c4' : '#4af', 4); detail(m, `<b>Spawn de ${pmc ? 'PMC' : 'Scav'}</b>`); return m; }),
+    'Loot valioso': (d.loot ?? []).map(l => ({ l, its: l.i.map(k => d.lootItems[k]).sort((a, b) => b.price - a.price) })).filter(x => x.its[0]?.price >= 40000).map(({ l, its }) => {
+      const m = L.marker([l.z, l.x], { icon: L.divIcon({ className: '', html: '<div class="loot"></div>', iconSize: [12, 12] }) });
+      detail(m, `<b>Pode aparecer aqui</b>${its.slice(0, 5).map(it => `<div class="row">${img(it.icon)}<span>${it.name}<br><span class="muted">${it.price ? it.price.toLocaleString('pt-BR') + ' ₽' : 'sem flea'}</span></span></div>`).join('')}${its.length > 5 ? `<span class="muted">e mais ${its.length - 5}</span>` : ''}`);
+      return m;
+    }),
+    'Onde podem estar (estimativa)': [estimateLayer],
   };
   const overlays = {};
   for (const [name, list] of Object.entries(groups)) {
@@ -108,6 +130,7 @@ function buildLayers(key) {
     if (layerOn[name]) overlays[name].addTo(leaflet);
   }
   L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(leaflet);
+  leaflet.on('overlayadd', drawEstimate);
   leaflet.on('overlayadd overlayremove', e => { layerOn[e.name] = e.type === 'overlayadd'; localStorage.setItem('gs-layers', JSON.stringify(layerOn)); });
 }
 
@@ -124,6 +147,7 @@ function drawSquad() {
 
 // Cronômetro: tempo de raid que falta, pela duração do mapa e pelo início lido no log
 function tick() {
+  if (Date.now() % 10000 < 1000) drawEstimate(); // círculos crescem a cada 10 s
   const dur = extracts[mapKeyNow()]?.duration;
   const left = raidStart && dur ? dur * 60 - (Date.now() - raidStart) / 1000 : -1;
   $('#raid-timer').hidden = left <= 0;
