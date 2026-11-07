@@ -40,3 +40,12 @@ Cada amigo roda o próprio GScanner. Um de vocês é o anfitrião.
 O anfitrião precisa estar acessível pelos amigos: mesma rede, Tailscale ou a porta 7777 liberada no roteador. Sem a senha certa, o anfitrião recusa a posição. Cada print no jogo atualiza a sua posição no mapa dos outros, e o ping (clique no mapa) aparece para todos.
 
 Pelo Tailscale (amigos em outras casas): todos instalam o Tailscale e entram na mesma rede. O `squadUrl` dos amigos usa o IP `100.x` do anfitrião (`tailscale ip -4`). O Windows trata a rede do Tailscale como Privada: no anfitrião, libere a porta 7777 nesse perfil (`New-NetFirewallRule -DisplayName GScanner -Direction Inbound -Protocol TCP -LocalPort 7777 -Profile Private -Action Allow`, como administrador).
+
+## Atualização automática
+O GScanner confere o GitHub a cada minuto. Se houver versão nova e você não tiver mudado nada nos arquivos, ele baixa, reinicia em cerca de 1 segundo e a página recarrega sozinha. Para isso a pasta precisa ser um clone do Git:
+
+1. Instale o Git e o Node 22.
+2. Rode `git clone https://github.com/LuccasGavarron/GScanner.git` (precisa ser colaborador do repositório).
+3. Entre na pasta e rode `npm start`.
+
+Para desligar, ponha `"autoUpdate": false` no `config.json`.
