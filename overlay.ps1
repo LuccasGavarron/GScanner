@@ -8,7 +8,7 @@ using System; using System.Drawing; using System.Windows.Forms; using System.Net
 using System.Globalization; using System.Collections; using System.Collections.Generic; using System.Web.Script.Serialization;
 public class Card : Form {
   Label title = Lbl(10.5f, true), flea = Lbl(10f), trader = Lbl(10f), slot = Lbl(10f), quests = Lbl(10f);
-  Label ammoHead = Lbl(8.5f), magHead = Lbl(8.5f);
+  Label ammoHead = Lbl(8.5f), magHead = Lbl(8.5f), stats = Lbl(9.5f);
   FlowLayoutPanel col = new FlowLayoutPanel(), ammoRow = Row(), magRow = Row();
   PictureBox pic = new PictureBox();
   static readonly CultureInfo BR = new CultureInfo("pt-BR");
@@ -27,7 +27,7 @@ public class Card : Form {
     BackColor = Color.FromArgb(27, 27, 27); Opacity = 0.95; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Padding = new Padding(0, 0, 10, 8);
     pic.Size = new Size(56, 56); pic.SizeMode = PictureBoxSizeMode.Zoom; pic.Location = new Point(8, 8); Controls.Add(pic);
     col.FlowDirection = FlowDirection.TopDown; col.WrapContents = false; col.AutoSize = true; col.Location = new Point(72, 6);
-    col.Controls.AddRange(new Control[] { title, flea, trader, slot, quests, ammoHead, ammoRow, magHead, magRow });
+    col.Controls.AddRange(new Control[] { title, flea, trader, slot, stats, quests, ammoHead, ammoRow, magHead, magRow });
     Controls.Add(col);
     slot.ForeColor = Color.Gray; quests.ForeColor = Color.FromArgb(255, 210, 100); ammoHead.ForeColor = magHead.ForeColor = Color.Gray;
     ammoHead.Text = "Munição (penetração / dano)"; magHead.Text = "Pentes";
@@ -72,6 +72,9 @@ public class Card : Form {
     var q = h["quests"] as ArrayList;
     quests.Text = q != null && q.Count > 0 ? "⚠ Quest: " + string.Join(", ", q.ToArray()) : "";
     quests.Visible = quests.Text != "";
+    var st = h.Contains("stats") ? h["stats"] as ArrayList : null; // mochila/colete: espaço; armadura: proteção
+    stats.Text = st != null ? string.Join(Environment.NewLine, st.ToArray()) : "";
+    stats.Visible = stats.Text != "";
     Fill(ammoRow, ammoHead, h.Contains("ammo") ? h["ammo"] as ArrayList : null, a => a["name"] + "\n" + a["pen"] + " / " + a["dmg"]);
     Fill(magRow, magHead, h.Contains("mags") ? h["mags"] as ArrayList : null, m => m["name"] + "\n" + m["cap"] + " balas");
     pic.Image = null;

@@ -9,6 +9,10 @@ public static class Win {
   public static long Sig(System.Drawing.Bitmap b) { long h = 17; for (int y = 0; y < b.Height; y += 7) for (int x = 0; x < b.Width; x += 7) h = h * 31 + b.GetPixel(x, y).ToArgb(); return h; }
   [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
   [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+  [StructLayout(LayoutKind.Sequential)] public struct CURSORINFO { public int cbSize, flags; public IntPtr hCursor; public POINT pt; }
+  [DllImport("user32.dll")] public static extern bool GetCursorInfo(ref CURSORINFO ci);
+  // Em raid o jogo esconde o cursor; ele só aparece com inventário ou menu aberto
+  public static bool CursorVisible() { var ci = new CURSORINFO(); ci.cbSize = Marshal.SizeOf(ci); return GetCursorInfo(ref ci) && (ci.flags & 1) != 0; }
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   public static string ForegroundProcess() {
@@ -35,13 +39,21 @@ function Read-Text([Drawing.Bitmap]$bmp) {
 }
 # Cada linha vira [texto, esquerda, topo, direita, base], com o cursor em (0, 0)
 function Lines-Json($lines, [int]$cx, [int]$cy) {
-  $parts = foreach ($l in $lines) {
-    $r = $l.Words | ForEach-Object { $_.BoundingRect }
-    $x1 = ($r | Measure-Object X -Minimum).Minimum; $y1 = ($r | Measure-Object Y -Minimum).Minimum
-    $x2 = ($r | ForEach-Object { $_.X + $_.Width } | Measure-Object -Maximum).Maximum; $y2 = ($r | ForEach-Object { $_.Y + $_.Height } | Measure-Object -Maximum).Maximum
-    '[' + (ConvertTo-Json -Compress $l.Text) + ",$([int]($x1 - $cx)),$([int]($y1 - $cy)),$([int]($x2 - $cx)),$([int]($y2 - $cy))]"
+  # laços simples: pipeline (Measure-Object, ForEach-Object) custava milissegundos por linha
+  $sb = New-Object Text.StringBuilder '['
+  foreach ($l in $lines) {
+    $x1 = 99999; $y1 = 99999; $x2 = -99999; $y2 = -99999
+    foreach ($w in $l.Words) {
+      $r = $w.BoundingRect
+      if ($r.X -lt $x1) { $x1 = $r.X }; if ($r.Y -lt $y1) { $y1 = $r.Y }
+      if ($r.X + $r.Width -gt $x2) { $x2 = $r.X + $r.Width }; if ($r.Y + $r.Height -gt $y2) { $y2 = $r.Y + $r.Height }
+    }
+    $t = $l.Text.Replace('\', '\\').Replace('"', '\"')
+    if ($sb.Length -gt 1) { [void]$sb.Append(',') }
+    [void]$sb.Append("[`"$t`",$([int]($x1 - $cx)),$([int]($y1 - $cy)),$([int]($x2 - $cx)),$([int]($y2 - $cy))]")
   }
-  '[' + ($parts -join ',') + ']'
+  [void]$sb.Append(']')
+  $sb.ToString()
 }
 
 # Arquivo de imagem como argumento: lê uma vez e sai (usado no teste).
@@ -51,8 +63,8 @@ $last = ''; $lastSig = 0; $n = 0
 while ($true) {
   Start-Sleep -Milliseconds 80
   if (($n++ % 50) -eq 0 -and $env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
-  if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') {
-    if ($last -ne '[]') { $last = '[]'; [Console]::Out.WriteLine($last); [Console]::Out.Flush() } # saiu do jogo: esconde o cartão
+  if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov' -or -not [Win]::CursorVisible()) {
+    if ($last -ne '[]') { $last = '[]'; [Console]::Out.WriteLine($last); [Console]::Out.Flush() } # fora do jogo ou em raid (sem cursor): esconde o cartão e não lê nada
     continue
   }
   $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)

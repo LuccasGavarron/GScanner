@@ -226,6 +226,22 @@ export function hoverInfo(d, i) {
 // Pente: munições que aceita. Arma: munições e pentes. Ícone em JPG (o overlay do Windows não abre WebP).
 function gearInfo(d, i) {
   const pr = i.properties;
+  // Mochila e colete de carga: espaço dentro x espaço que ocupa (para decidir a troca). Armadura e capacete: proteção.
+  const pct = v => `${Math.round((v ?? 0) * 100)}%`;
+  const kg = `${i.weight} kg`;
+  if (['ItemPropertiesBackpack', 'ItemPropertiesChestRig'].includes(pr?.propertiesType) && pr.capacity) {
+    const out = i.width * i.height;
+    return { stats: [
+      `Espaço dentro: ${pr.capacity} · ocupa ${i.width}x${i.height} (${out}) · rende ${(pr.capacity / out).toFixed(1)}x`,
+      `${pr.class ? `Classe ${pr.class} · durabilidade ${pr.durability} · ` : ''}Peso ${kg} · velocidade ${pct(pr.speedPenalty)} · ergonomia ${pct(pr.ergoPenalty)}`,
+    ] };
+  }
+  if (['ItemPropertiesArmor', 'ItemPropertiesHelmet'].includes(pr?.propertiesType)) {
+    return { stats: [
+      `Classe ${pr.class} · durabilidade ${pr.durability}${pr.armorType ? ` · ${pr.armorType === 'Heavy' ? 'pesado' : pr.armorType === 'Light' ? 'leve' : 'sem som abafado'}` : ''}`,
+      `Peso ${kg} · velocidade ${pct(pr.speedPenalty)} · giro ${pct(pr.turnPenalty)} · ergonomia ${pct(pr.ergoPenalty)}`,
+    ] };
+  }
   if (!pr || !['ItemPropertiesMagazine', 'ItemPropertiesWeapon'].includes(pr.propertiesType)) return {};
   const byId = new Map(items(d).map(x => [x.id, x]));
   const name = x => tr(d.itemsPt ?? d.itemsEn, x.shortName);

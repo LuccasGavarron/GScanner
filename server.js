@@ -126,6 +126,15 @@ function watchShots() {
 }
 
 // Hover: hover.ps1 lê o texto perto do mouse (OCR do Windows); o servidor acha o item e publica.
+// cache/hover.log: cada leitura e o item escolhido, para achar erro de hover; recomeça ao passar de 300 KB
+const HOVER_LOG = path.join(CACHE, 'hover.log');
+function hoverLog(text) {
+  try {
+    if (fs.existsSync(HOVER_LOG) && fs.statSync(HOVER_LOG).size > 300_000) fs.writeFileSync(HOVER_LOG, '');
+    fs.appendFileSync(HOVER_LOG, `${new Date().toISOString().slice(11, 23)} ${text}\n`);
+  } catch { /* log é só ajuda: nunca derruba o hover */ }
+}
+
 function watchHover() {
   if (process.platform !== 'win32') return;
   const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'hover.ps1')], { env: { ...process.env, GSCANNER_PID: String(process.pid) } });
@@ -139,7 +148,9 @@ function watchHover() {
         const d = await offlineData();
         const boxes = [].concat(JSON.parse(l) ?? []);
         // nome completo da dica do jogo vence; sem dica ainda, o rótulo curto da grade dá o item na hora
-        const item = offline.findItem(d, boxes.map(b => (Array.isArray(b) ? b[0] : b))) ?? offline.pickByLabel(d, boxes.filter(Array.isArray));
+        const byName = offline.findItem(d, boxes.map(b => (Array.isArray(b) ? b[0] : b)));
+        const item = byName ?? offline.pickByLabel(d, boxes.filter(Array.isArray));
+        hoverLog(`${item ? (byName ? 'dica ' : 'rótulo ') + item.normalizedName : '-'} <= ${l.trim()}`);
         if (item && item.id !== lastId) { lastId = item.id; publish('hover', offline.hoverInfo(d, item)); }
         if (!item && lastId) { lastId = null; publish('hover', null); } // dica sumiu: esconde o cartão
       } catch { /* linha incompleta ou sem dados: ignora */ }
