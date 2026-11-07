@@ -37,6 +37,7 @@ if ($args.Count) { Read-Text ([Drawing.Bitmap]::new($args[0])) | ConvertTo-Json 
 $last = ''
 while ($true) {
   Start-Sleep -Milliseconds 300
+  if ($env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
   if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') { continue }
   $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
   # A dica do item aparece ao lado do cursor: região de 900x140 em volta dele

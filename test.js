@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseScreenshot, mapFromLogLine, mapKey, armorGrade, floorAt } from './public/shared.js';
+import { parseScreenshot, mapFromLogLine, mapKey, armorGrade, floorAt, raidStartFromLogLine } from './public/shared.js';
 
 test('andar pela altura e pela área', () => {
   const layers = [
@@ -118,6 +118,8 @@ test('mapa no log', () => {
   assert.equal(mapFromLogLine('2026-11-07 02:09:58.006|1.3.0.1.48558|Info|application|scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset'), 'bigmap');
   assert.equal(mapFromLogLine('qualquer coisa Location: woods'), null);
   assert.equal(mapKey('RezervBase'), 'reserve');
+  assert.equal(raidStartFromLogLine('2026-11-07 02:11:03.675|1.3.0.1.48558|Info|application|GameStarted:57.21(0) real:66.45(0) diff:9.23'), new Date(2026, 10, 7, 2, 11, 3, 675).getTime());
+  assert.equal(raidStartFromLogLine('2026-11-07 02:11:03.675|1.3.0.1.48558|Info|application|GameStarting:57.21(0)'), null);
 });
 
 test('munição x armadura', () => {

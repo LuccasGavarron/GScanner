@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { execSync, spawn } from 'node:child_process';
-import { parseScreenshot, mapFromLogLine, mapKey } from './public/shared.js';
+import { parseScreenshot, mapFromLogLine, mapKey, raidStartFromLogLine } from './public/shared.js';
 import * as offline from './offline.js';
 import { spectrumDb, toBands, footstepProfile } from './public/sound.js';
 
@@ -21,10 +21,59 @@ const LOGS = process.env.EFT_LOGS ?? path.join(install, 'Logs');
 
 // Estado atual e clientes conectados por SSE
 const state = {};
-const clients = new Set();
+const clients = new Map(); // res -> true se for um amigo remoto (só recebe o squad)
 function publish(type, data) {
   state[type] = data;
-  for (const res of clients) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+  for (const [res, squadOnly] of clients) if (!squadOnly || type === 'squad') res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+}
+
+// Squad: amigos no mapa. Cada GScanner manda a própria posição ao anfitrião (SQUAD_URL; sem ela, o anfitrião
+// é este servidor) e recebe a lista do grupo. SQUAD_KEY é a senha do grupo.
+// config.json (fora do Git): { "squadName": "...", "squadKey": "...", "squadUrl": "http://ip-do-anfitriao:7777" }; variável de ambiente vence
+const cfg = (() => { try { return JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'config.json'), 'utf8')); } catch { return {}; } })();
+const SQUAD = { name: process.env.SQUAD_NAME ?? cfg.squadName, url: (process.env.SQUAD_URL ?? cfg.squadUrl)?.replace(/\/$/, ''), key: process.env.SQUAD_KEY ?? cfg.squadKey };
+const squad = new Map();
+let myPing = null;
+const keyOk = k => !!SQUAD.key && typeof k === 'string' && k.length === SQUAD.key.length && crypto.timingSafeEqual(Buffer.from(k), Buffer.from(SQUAD.key));
+function squadUpdate(m) {
+  const ok = typeof m?.name === 'string' && m.name.length <= 20 && typeof m.map === 'string' && m.map.length <= 40
+    && [m.x, m.z, m.yaw].every(Number.isFinite) && (!m.ping || [m.ping.x, m.ping.z].every(Number.isFinite));
+  if (!ok) return false;
+  squad.set(m.name, { name: m.name, map: m.map, x: m.x, z: m.z, yaw: m.yaw, ping: m.ping ? { x: m.ping.x, z: m.ping.z } : null, at: Date.now() });
+  for (const [k, v] of squad) if (Date.now() - v.at > 300_000) squad.delete(k); // sumiu há 5 min
+  publish('squad', [...squad.values()]);
+  return true;
+}
+function squadSend() {
+  if (!SQUAD.name || !state.position || !state.map) return;
+  const { x, z, yaw } = state.position;
+  const me = { name: SQUAD.name, map: state.map, x, z, yaw, ping: myPing };
+  if (!SQUAD.url) return squadUpdate(me);
+  fetch(SQUAD.url + '/squad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...me, key: SQUAD.key }), signal: AbortSignal.timeout(5000) })
+    .catch(() => { /* anfitrião fora do ar: tenta de novo no próximo envio */ });
+}
+async function squadListen() { // amigo: recebe a lista do anfitrião
+  try {
+    const r = await fetch(`${SQUAD.url}/squad/events?key=${encodeURIComponent(SQUAD.key ?? '')}`);
+    if (!r.ok) throw new Error(r.status);
+    let buf = '';
+    for await (const chunk of r.body) {
+      buf += Buffer.from(chunk).toString();
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const p of parts) {
+        const msg = JSON.parse(p.replace(/^data: /, ''));
+        if (msg.type === 'squad') publish('squad', msg.data);
+      }
+    }
+  } catch { /* cai e reconecta */ }
+  setTimeout(squadListen, 5000);
+}
+
+function readJson(req, max, cb) {
+  let body = '';
+  req.on('data', c => { body += c; if (body.length > max) req.destroy(); });
+  req.on('end', () => { try { cb(JSON.parse(body || '{}')); } catch { cb(null); } });
 }
 
 // Screenshots: posição do jogador
@@ -32,7 +81,7 @@ function watchShots() {
   try {
     fs.watch(SHOTS, (_, name) => {
       const pos = name && parseScreenshot(name);
-      if (pos) publish('position', pos);
+      if (pos) { publish('position', pos); squadSend(); }
     });
     console.log('Screenshots:', SHOTS);
     // print mais recente dos últimos 10 min: pega a posição mesmo se o servidor subiu depois dele
@@ -48,7 +97,7 @@ function watchShots() {
 // Hover: hover.ps1 lê o texto perto do mouse (OCR do Windows); o servidor acha o item e publica.
 function watchHover() {
   if (process.platform !== 'win32') return;
-  const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'hover.ps1')]);
+  const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'hover.ps1')], { env: { ...process.env, GSCANNER_PID: String(process.pid) } });
   let buf = '', lastId;
   ps.stdout.on('data', async chunk => {
     buf += chunk;
@@ -121,7 +170,9 @@ function pollLogs() {
     offset = size;
     for (const line of buf.toString('utf8').split('\n')) {
       const id = mapFromLogLine(line);
-      if (id) publish('map', mapKey(id));
+      if (id) { publish('map', mapKey(id)); publish('raidStart', null); squadSend(); }
+      const start = raidStartFromLogLine(line);
+      if (start) publish('raidStart', start);
     }
   } catch { /* jogo ainda não instalado ou sem logs */ }
 }
@@ -181,10 +232,10 @@ async function getExtracts() {
   for (const m of Object.values(maps.data.maps)) {
     const key = mapKey(m.nameId);
     if (out[key]) continue; // variantes (noite, lab escuro) usam o mesmo mapa
-    out[key] = [
+    out[key] = { duration: m.raidDuration, points: [
       ...m.extracts.map(e => ({ name: en.data[e.name] ?? e.name, faction: e.faction, x: e.position.x, z: e.position.z })),
       ...m.transits.map(t => ({ name: en.data[t.description] ?? 'Transit', faction: 'transit', x: t.position.x, z: t.position.z })),
-    ];
+    ] };
   }
   return (extracts = out);
 }
@@ -201,10 +252,22 @@ http.createServer((req, res) => {
       () => res.writeHead(503).end('{}'));
     return;
   }
-  if (req.url === '/events') {
+  if (req.url === '/squad' && req.method === 'POST') { // posição de um amigo
+    return readJson(req, 10_000, m => res.writeHead(!m || !keyOk(m.key) ? 403 : squadUpdate(m) ? 200 : 400).end());
+  }
+  if (req.url === '/ping' && req.method === 'POST') { // ping desta página, repassado ao grupo
+    return readJson(req, 1000, p => {
+      myPing = p && [p.x, p.z].every(Number.isFinite) ? { x: p.x, z: p.z } : null;
+      squadSend();
+      res.writeHead(200).end();
+    });
+  }
+  const squadOnly = req.url.startsWith('/squad/events');
+  if (req.url === '/events' || squadOnly) {
+    if (squadOnly && !keyOk(new URL(req.url, 'http://x').searchParams.get('key'))) return res.writeHead(403).end();
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
-    for (const [type, data] of Object.entries(state)) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
-    clients.add(res);
+    for (const [type, data] of Object.entries(state)) if (!squadOnly || type === 'squad') res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+    clients.set(res, squadOnly);
     req.on('close', () => clients.delete(res));
     return;
   }
@@ -222,4 +285,10 @@ http.createServer((req, res) => {
   watchShots();
   watchHover();
   setInterval(pollLogs, 2000);
+  if (SQUAD.name) {
+    publish('me', SQUAD.name);
+    console.log(`Squad: ${SQUAD.name} -> ${SQUAD.url ?? 'anfitrião (este PC)'}`);
+    if (SQUAD.url) squadListen();
+    setInterval(squadSend, 30_000); // mantém o nome vivo no grupo mesmo parado
+  }
 });

@@ -20,6 +20,10 @@
   .bar { padding: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .me { width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 20px solid #3cf; transform-origin: 50% 60%; }
   .ping { width: 14px; height: 14px; border-radius: 50%; background: #f53; border: 2px solid #fff; }
+  .mate { width: 14px; height: 14px; border-radius: 50%; background: #39f; border: 2px solid #fff; }
+  .mate-ping { background: #39f; border-style: dashed; }
+  .place { display: inline-block; color: rgba(255, 255, 255, .55); font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px #000; transform: translate(-50%, -50%); }
+  #raid-timer { color: #fd6; }
   table { border-collapse: collapse; margin: 6px; }
   th, td { padding: 4px 8px; border-bottom: 1px solid #2a2a2a; text-align: right; }
   th { position: sticky; top: 0; background: #1b1b1b; cursor: pointer; }
@@ -28,6 +32,7 @@
   .muted { color: #888; }
   #hover-card { position: fixed; top: 46px; right: 8px; z-index: 1000; display: flex; gap: 10px; background: #1b1b1b; border: 1px solid #444; padding: 8px 12px; max-width: 420px; font-size: 15px; }
   #hover-card img { width: 64px; height: 64px; }
+  #hover-card[hidden] { display: none; }
   .ex-label { background: rgba(0, 0, 0, .7); color: #fff; border: 0; box-shadow: none; font-size: 11px; padding: 1px 4px; }
   .ex-label::before { display: none; }
   .best { color: #7d7; font-weight: bold; }
@@ -62,8 +67,9 @@
       <option value="none">Sem extrações</option>
     </select>
     <label><input id="follow" type="checkbox" checked> Seguir personagem</label>
+    <b id="raid-timer" hidden></b>
     <button id="clear-pings">Limpar pings</button>
-    <span class="muted" id="map-status">Clique no mapa para pingar. Print Screen no jogo mostra onde você está.</span>
+    <span class="muted" id="map-status"></span>
   </div>
   <div id="map"></div>
 </section>

@@ -27,3 +27,12 @@ O GScanner não toca no processo do jogo: não lê memória, não lê rede e nã
 
 ## Testes
 `npm test`
+
+## Jogar com amigos (squad)
+Cada amigo roda o próprio GScanner. Um de vocês é o anfitrião.
+
+1. No anfitrião, crie `config.json` nesta pasta: `{ "squadName": "SeuNome", "squadKey": "senha-do-grupo" }`.
+2. Em cada amigo, crie `config.json`: `{ "squadName": "NomeDele", "squadKey": "senha-do-grupo", "squadUrl": "http://IP-DO-ANFITRIAO:7777" }`.
+3. Rode `npm start` em todos.
+
+O anfitrião precisa estar acessível pelos amigos: mesma rede, Tailscale ou a porta 7777 liberada no roteador. Sem a senha certa, o anfitrião recusa a posição. Cada print no jogo atualiza a sua posição no mapa dos outros, e o ping (clique no mapa) aparece para todos.

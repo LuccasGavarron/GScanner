@@ -21,6 +21,13 @@ export function mapFromLogLine(line) {
   return /Location: ([^,\s]+)/.exec(line)?.[1] ?? null;
 }
 
+// Início da raid (relógio começa a contar): "2026-11-07 02:11:03.675|...|application|GameStarted:..." -> ms
+export function raidStartFromLogLine(line) {
+  if (!line.includes('|application|GameStarted')) return null;
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}\.\d+)/.exec(line);
+  return m ? new Date(`${m[1]}T${m[2]}`).getTime() : null;
+}
+
 // nameId do jogo -> normalizedName do tarkov.dev
 const MAP_IDS = {
   bigmap: 'customs', factory4_day: 'factory', factory4_night: 'factory', woods: 'woods',
