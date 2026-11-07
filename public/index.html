@@ -28,6 +28,30 @@
   .mate-ping { --c: #39f; }
   .place { display: inline-block; color: rgba(255, 255, 255, .55); font-size: 12px; font-weight: bold; white-space: nowrap; text-shadow: 0 0 3px #000; transform: translate(-50%, -50%); }
   #raid-timer { color: #fd6; }
+  #tab-map { position: relative; }
+  #task-panel { position: absolute; top: 96px; left: 52px; z-index: 900; width: 320px; max-height: calc(100% - 120px); overflow: auto; background: rgba(27, 27, 27, .93); border: 1px solid #444; padding: 8px 10px; font-size: 13px; }
+  #task-panel[hidden] { display: none; }
+  .ptask { border-top: 1px solid #333; margin-top: 6px; padding-top: 6px; }
+  .ptask label { display: block; margin: 3px 0; cursor: pointer; }
+  .ptask label.done { color: #777; text-decoration: line-through; }
+  .ptask a { color: #9a8866; }
+  .task-head { display: flex; gap: 8px; align-items: center; }
+  .task-head button { margin-left: auto; }
+  .x { background: none !important; color: #aaa !important; font-size: 18px; padding: 0 4px !important; }
+  img.trader { width: 44px; height: 44px; } img.trader.small { width: 28px; height: 28px; }
+  #task-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 8px; padding: 6px; }
+  .task { background: #1b1b1b; border: 1px solid #333; padding: 8px; }
+  .task.pinned { border-color: #b6f; }
+  .task ul { margin: 6px 0 0; padding-left: 18px; color: #bbb; }
+  .task-head button, #task-list button { background: #9a8866; color: #111; border: 0; padding: 4px 10px; cursor: pointer; }
+  .items { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px 20px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: #262626; padding: 1px 6px 1px 2px; font-size: 12px; }
+  .chip img { width: 22px; height: 22px; }
+  .qmark { width: 24px; height: 24px; border-radius: 50%; background: #b6f; border: 2px solid #fff; overflow: hidden; }
+  .qmark img { width: 100%; height: 100%; }
+  .qmark.zone { display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; cursor: pointer; box-shadow: 0 0 8px #b6f; }
+  .loot.qloot { background: #b6f; box-shadow: 0 0 6px #b6f; }
+  #task-q { width: 220px; }
   .loot { width: 10px; height: 10px; background: #fc3; border: 1px solid #000; transform: rotate(45deg); box-shadow: 0 0 6px #fc3; }
   .boss img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #f53; background: #000; }
   .detail .leaflet-popup-content-wrapper, .detail .leaflet-popup-tip { background: #1b1b1b; color: #ddd; border: 1px solid #444; }
@@ -61,6 +85,7 @@
 <nav>
   <b style="padding: 0 8px">GScanner</b>
   <button data-tab="tab-map" class="on">Mapa</button>
+  <button data-tab="tab-tasks">Missões</button>
   <button data-tab="tab-ammo">Munição</button>
   <button data-tab="tab-price">Preço</button>
   <button data-tab="tab-build">Armas</button>
@@ -85,6 +110,17 @@
     <span class="muted" id="map-status"></span>
   </div>
   <div id="map"></div>
+  <div id="task-panel" hidden></div>
+</section>
+
+<section id="tab-tasks" class="tab">
+  <div class="bar">
+    <input id="task-q" placeholder="Buscar missão" autocomplete="off">
+    <select id="task-trader"></select>
+    <select id="task-map"></select>
+    <label><input id="task-kappa" type="checkbox"> Só Kappa</label>
+  </div>
+  <div id="task-list"></div>
 </section>
 
 <section id="tab-ammo" class="tab">

@@ -119,9 +119,9 @@ export function tasks(d, maps, mapKey) {
   const itemById = new Map(items(d).map(i => [i.id, i]));
   const item = id => {
     const i = itemById.get(id);
-    if (i) return { name: tr(d.itemsPt ?? d.itemsEn, i.name), icon: i.iconLink, price: fleaPrice(i) || null };
+    if (i) return { id, name: tr(d.itemsPt ?? d.itemsEn, i.name), icon: i.iconLink, price: fleaPrice(i) || null };
     const q = d.tasks.data.questItems[id];
-    return q ? { name: T(q.name), icon: q.iconLink, quest: true } : null;
+    return q ? { id, name: T(q.name), icon: q.iconLink, quest: true } : null;
   };
   const traders = d.traders.data;
   const pos = p => ({ x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 });
@@ -131,7 +131,7 @@ export function tasks(d, maps, mapKey) {
     map: keyOfMap.get(t.map) ?? null,
     keys: (t.neededKeys ?? []).flatMap(k => k.keys.map(id => ({ ...item(id), map: keyOfMap.get(k.map) }))),
     objectives: t.objectives.map(o => ({
-      type: o.type, text: T(o.description), optional: o.optional, count: o.count ?? 1, fir: !!o.foundInRaid,
+      id: o.id, type: o.type, text: T(o.description), optional: o.optional, count: o.count ?? 1, fir: !!o.foundInRaid,
       items: [...(o.items ?? []).slice(0, 6), o.questItem, o.markerItem].filter(Boolean).map(item).filter(Boolean),
       zones: (o.zones ?? []).map(z => ({ map: keyOfMap.get(z.map), outline: z.outline.map(pos), ...pos(z.position) })),
       locations: (o.possibleLocations ?? []).flatMap(l => l.positions.map(p => ({ map: keyOfMap.get(l.map), ...pos(p) }))),

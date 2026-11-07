@@ -25,6 +25,8 @@ let style = localStorage.getItem('gs-style') ?? 'sat', svgEl;
 let zoomOutside = null, current, leaflet, me, myPing, floorLayer, bounds, extractLayer, squadLayer, extracts = {}, lastPos, raidStart, squadMembers = [], myName;
 export let overlay; // camada livre para outros módulos (missões) desenharem no mapa
 export const mapKeyNow = () => $('#map-select').value;
+export const mapInfo = key => extracts[key];
+export const flyTo = (x, z) => leaflet?.flyTo([z, x], Math.max(leaflet.getZoom(), (current?.maxZoom ?? 5) - 1.5), { duration: 0.6 });
 const onShow = [];
 export const onMapShown = f => onShow.push(f);
 
@@ -68,7 +70,7 @@ function drawExtracts() {
 }
 
 // Detalhe ao passar o mouse: um popup sem botão que some ao sair
-function detail(layer, html) {
+export function detail(layer, html) {
   layer.on('mouseover', e => L.popup({ closeButton: false, autoPan: false, className: 'detail', offset: [0, -6] }).setLatLng(e.latlng).setContent(html).openOn(leaflet));
   layer.on('mouseout', () => leaflet.closePopup());
 }

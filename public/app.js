@@ -5,6 +5,7 @@ import { initBuild } from './build.js';
 import { initPrice } from './price.js';
 import { initSound } from './soundtab.js';
 import { initHover } from './hover.js';
+import { initMissions } from './missions.js';
 
 // Abas
 for (const b of document.querySelectorAll('nav button')) {
@@ -22,3 +23,4 @@ initBuild();
 initPrice();
 initSound();
 initHover();
+initMissions();
