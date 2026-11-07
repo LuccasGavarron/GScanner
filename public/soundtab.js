@@ -5,20 +5,26 @@ let stream, ctx, frames = [];
 const secs = () => Math.round(frames.length * 2048 / (ctx?.sampleRate ?? 48000));
 
 async function start() {
+  ctx = new AudioContext(); // criado no clique: depois da janela de escolha o Chrome o deixaria pausado
   try {
     // systemAudio: o navegador oferece "compartilhar áudio do sistema" ao escolher a tela
-    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, systemAudio: 'include' });
+    // vídeo a 1 quadro/s: o Chrome encerra a captura inteira se o vídeo for parado
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: true, systemAudio: 'include' });
   } catch (e) {
     console.error('getDisplayMedia', e);
+    ctx.close();
     const why = e.name === 'NotAllowedError' ? 'a janela de escolha foi fechada ou o Chrome bloqueou a captura' : e.message;
     return void ($('#sound-status').textContent = `Não gravou: ${why} (${e.name}).`);
   }
   if (!stream.getAudioTracks().length) {
     stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    ctx.close();
     return void ($('#sound-status').textContent = 'Sem áudio: escolha "Tela inteira" e marque "Compartilhar áudio do sistema".');
   }
-  stream.getVideoTracks().forEach(t => t.stop()); // só o som interessa
-  ctx = new AudioContext();
+  // captura encerrada por fora (botão "Parar compartilhamento" do Chrome): analisa o que já gravou
+  stream.getAudioTracks()[0].onended = () => stream && stop();
+  await ctx.resume();
   const src = ctx.createMediaStreamSource(stream);
   const an = ctx.createAnalyser();
   an.fftSize = 4096;
