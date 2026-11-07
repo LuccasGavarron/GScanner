@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { execSync, execFile, spawn } from 'node:child_process';
-import { parseScreenshot, mapFromLogLine, mapKey, raidStartFromLogLine } from './public/shared.js';
+import { parseScreenshot, mapFromLogLine, mapKey, raidStartFromLogLine, profileFromLogLine } from './public/shared.js';
 import * as offline from './offline.js';
 import { encodeInvite, decodeInvite } from './offline.js';
 import { spectrumDb, toBands, footstepProfile, nearestProfile } from './public/sound.js';
@@ -226,7 +226,7 @@ function eqAuto(on) {
 }
 
 // Logs: mapa da raid. Lê o arquivo novo inteiro, para pegar a raid em andamento, e depois só o que entrar.
-let logFile, offset = 0;
+let logFile, offset = 0, pmcProfile;
 function pollLogs() {
   try {
     // mais nova pela data de modificação: o nome traz a hora sem zero ("2-00-25" viria depois de "12-38-34")
@@ -248,6 +248,9 @@ function pollLogs() {
       if (id) { publish('map', mapKey(id)); publish('raidStart', null); squadSend(); }
       const start = raidStartFromLogLine(line);
       if (start) publish('raidStart', start);
+      const prof = profileFromLogLine(line);
+      if (prof?.selected) pmcProfile = prof.selected;
+      if (prof?.raid && pmcProfile) publish('side', prof.raid === pmcProfile ? 'pmc' : 'scav'); // filtro de extrações segue
     }
   } catch { /* jogo ainda não instalado ou sem logs */ }
 }

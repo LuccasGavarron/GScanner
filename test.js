@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseScreenshot, mapFromLogLine, mapKey, armorGrade, floorAt, raidStartFromLogLine } from './public/shared.js';
+import { parseScreenshot, mapFromLogLine, mapKey, armorGrade, floorAt, raidStartFromLogLine, profileFromLogLine } from './public/shared.js';
 
 test('andar pela altura e pela área', () => {
   const layers = [
@@ -144,6 +144,9 @@ test('mapa no log', () => {
   assert.equal(mapKey('Sandbox_start'), 'ground-zero');
   assert.equal(mapFromLogLine('qualquer coisa Location: woods'), null);
   assert.equal(mapKey('RezervBase'), 'reserve');
+  assert.deepEqual(profileFromLogLine('2026-11-07 12:39:07.721|1|Info|application|CompleteSelectedProfile ProfileId:67bf85228405b2f96f08a0dc AccountId:1'), { selected: '67bf85228405b2f96f08a0dc' });
+  assert.deepEqual(profileFromLogLine("TRACE-NetworkGameCreate profileStatus: 'Profileid: 67bf85228405b2f96f08a0dd, Status: Busy"), { raid: '67bf85228405b2f96f08a0dd' });
+  assert.equal(profileFromLogLine('qualquer coisa'), null);
   assert.equal(raidStartFromLogLine('2026-11-07 02:11:03.675|1.3.0.1.48558|Info|application|GameStarted:57.21(0) real:66.45(0) diff:9.23'), new Date(2026, 10, 7, 2, 11, 3, 675).getTime());
   assert.equal(raidStartFromLogLine('2026-11-07 02:11:03.675|1.3.0.1.48558|Info|application|GameStarting:57.21(0)'), null);
 });

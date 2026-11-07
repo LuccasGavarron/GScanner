@@ -318,6 +318,7 @@ export async function initMap() {
     if (type === 'map' && maps[data] && current !== maps[data]) showMap(data);
     if (type === 'position') showPosition(data);
     if (type === 'raidStart') raidStart = data;
+    if (type === 'side' && $('#extract-filter').value !== data) { $('#extract-filter').value = data; drawExtracts(); } // raid de PMC ou de Scav
     if (type === 'squad') { squadMembers = data; drawSquad(); }
     if (type === 'me') myName = data;
   });

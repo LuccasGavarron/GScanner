@@ -29,6 +29,15 @@ export function raidStartFromLogLine(line) {
   return m ? new Date(`${m[1]}T${m[2]}`).getTime() : null;
 }
 
+// Lado da raid. "CompleteSelectedProfile ProfileId:X" é o perfil PMC escolhido; ao entrar na raid,
+// "profileStatus: 'Profileid: Y" é o perfil usado: igual ao PMC é raid de PMC, diferente é de Scav.
+export function profileFromLogLine(line) {
+  const sel = /CompleteSelectedProfile ProfileId:(\w+)/.exec(line);
+  if (sel) return { selected: sel[1] };
+  const raid = /profileStatus: 'Profileid: (\w+)/.exec(line);
+  return raid ? { raid: raid[1] } : null;
+}
+
 // nameId do jogo -> normalizedName do tarkov.dev
 const MAP_IDS = {
   bigmap: 'customs', factory4_day: 'factory', factory4_night: 'factory', woods: 'woods',
