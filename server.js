@@ -108,6 +108,7 @@ function watchHover() {
         const d = await offlineData();
         const item = offline.findItem(d, [].concat(JSON.parse(l) ?? []));
         if (item && item.id !== lastId) { lastId = item.id; publish('hover', offline.hoverInfo(d, item)); }
+        if (!item && lastId) { lastId = null; publish('hover', null); } // dica sumiu: esconde o cartão
       } catch { /* linha incompleta ou sem dados: ignora */ }
     }
   });
