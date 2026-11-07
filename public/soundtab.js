@@ -1,57 +1,28 @@
 import { $ } from './api.js';
-import { toBands, footstepProfile, suggestEq } from './sound.js';
+import { suggestEq } from './sound.js';
 
-let stream, ctx, frames = [];
-const secs = () => Math.round(frames.length * 2048 / (ctx?.sampleRate ?? 48000));
+// A gravação roda no servidor (som direto do Windows); a página só liga, acompanha e desliga.
+let timer;
+const post = url => fetch(url, { method: 'POST' }).then(r => r.json());
 
 async function start() {
-  ctx = new AudioContext(); // criado no clique: depois da janela de escolha o Chrome o deixaria pausado
-  try {
-    // systemAudio: o navegador oferece "compartilhar áudio do sistema" ao escolher a tela
-    // vídeo a 1 quadro/s: o Chrome encerra a captura inteira se o vídeo for parado
-    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: true, systemAudio: 'include' });
-  } catch (e) {
-    console.error('getDisplayMedia', e);
-    ctx.close();
-    const why = e.name === 'NotAllowedError' ? 'a janela de escolha foi fechada ou o Chrome bloqueou a captura' : e.message;
-    return void ($('#sound-status').textContent = `Não gravou: ${why} (${e.name}).`);
-  }
-  if (!stream.getAudioTracks().length) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-    ctx.close();
-    return void ($('#sound-status').textContent = 'Sem áudio: escolha "Tela inteira" e marque "Compartilhar áudio do sistema".');
-  }
-  // captura encerrada por fora (botão "Parar compartilhamento" do Chrome): analisa o que já gravou
-  stream.getAudioTracks()[0].onended = () => stream && stop();
-  await ctx.resume();
-  const src = ctx.createMediaStreamSource(stream);
-  const an = ctx.createAnalyser();
-  an.fftSize = 4096;
-  an.smoothingTimeConstant = 0;
-  // ScriptProcessor roda no fio de áudio: continua medindo com a janela em segundo plano
-  const proc = ctx.createScriptProcessor(2048, 1, 1);
-  const buf = new Float32Array(an.frequencyBinCount);
-  proc.onaudioprocess = () => {
-    an.getFloatFrequencyData(buf);
-    frames.push(toBands(buf, ctx.sampleRate, an.fftSize));
-    if (frames.length % 20 === 0) $('#sound-status').textContent = `Gravando: ${secs()} s.`;
-  };
-  frames = [];
-  src.connect(an);
-  src.connect(proc);
-  proc.connect(ctx.destination); // saída fica em silêncio; a conexão só faz o processador rodar
+  await post('/sound/start');
   $('#sound-go').textContent = 'Parar e analisar';
+  timer = setInterval(async () => {
+    const s = await post('/sound/status');
+    if (s.error) return stop();
+    $('#sound-status').textContent = `Gravando: ${s.secs} s.`;
+  }, 1000);
 }
 
-function stop() {
-  stream.getTracks().forEach(t => t.stop());
-  ctx.close();
-  stream = null;
+async function stop() {
+  clearInterval(timer);
+  timer = null;
   $('#sound-go').textContent = 'Gravar som do PC';
-  const p = footstepProfile(frames);
+  const { profile: p, secs, error } = await post('/sound/stop');
+  if (error) return void ($('#sound-status').textContent = error);
   if (!p) return void ($('#sound-status').textContent = 'Pouco som gravado. Grave uns 30 s andando.');
-  p.note = `${p.events} momentos de passo em ${secs()} s, gravado em ${new Date().toLocaleString('pt-BR')}.`;
+  p.note = `${p.events} momentos de passo em ${secs} s, gravado em ${new Date().toLocaleString('pt-BR')}.`;
   localStorage.setItem('gs-sound-' + $('#sound-profile').value, JSON.stringify(p));
   render(p);
 }
@@ -79,7 +50,7 @@ export function render(p) {
 }
 
 export function initSound() {
-  $('#sound-go').onclick = () => (stream ? stop() : start());
+  $('#sound-go').onclick = () => (timer ? stop() : start());
   $('#sound-copy').onclick = () => navigator.clipboard.writeText($('#sound-eq').textContent);
   $('#sound-profile').onchange = showSaved;
   showSaved();

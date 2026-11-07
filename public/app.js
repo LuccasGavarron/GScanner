@@ -4,6 +4,7 @@ import { initAmmo } from './ammo.js';
 import { initBuild } from './build.js';
 import { initPrice } from './price.js';
 import { initSound } from './soundtab.js';
+import { initHover } from './hover.js';
 
 // Abas
 for (const b of document.querySelectorAll('nav button')) {
@@ -20,3 +21,4 @@ initAmmo();
 initBuild();
 initPrice();
 initSound();
+initHover();

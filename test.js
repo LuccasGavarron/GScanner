@@ -13,8 +13,18 @@ test('andar pela altura e pela área', () => {
   assert.equal(floorAt(undefined, { x: 0, y: 0, z: 0 }), -1);
 });
 import { optimize } from './public/optimize.js';
-import { BANDS, toBands, footstepProfile, suggestEq } from './public/sound.js';
-import { answer } from './offline.js';
+import { BANDS, toBands, footstepProfile, suggestEq, spectrumDb } from './public/sound.js';
+
+test('FFT acha o tom certo', () => {
+  const rate = 48000, n = 4096, f = 3000;
+  const s = Float32Array.from({ length: n }, (_, i) => Math.sin(2 * Math.PI * f * i / rate));
+  const db = spectrumDb(s);
+  const peak = db.indexOf(Math.max(...db));
+  assert.ok(Math.abs(peak * rate / n - f) < rate / n, `pico em ${peak * rate / n} Hz`);
+  const bands = toBands(db, rate, n);
+  assert.equal(BANDS[bands.indexOf(Math.max(...bands))], 3150); // 3 kHz cai na banda de 3,15 kHz
+});
+import { answer, findItem, hoverInfo } from './offline.js';
 
 test('cópia JSON vira resposta das abas', () => {
   const d = {
@@ -34,6 +44,15 @@ test('cópia JSON vira resposta das abas', () => {
   const [ledx] = answer(d, { query: 'query($q: String) { items(name: $q) {} }', variables: { q: 'ledx' } }).items;
   assert.equal(ledx.sellFor[0].vendor.name, 'Prapor');
   assert.deepEqual(ledx.usedInTasks, [{ name: 'Private Clinic' }]);
+
+  // hover: acha o item pela linha lida, mesmo com erro de OCR, e ignora rótulo curto da grade
+  d.itemsPt = { 'l Name': 'Transiluminador de pele LEDX' };
+  d.traders.data.t.imageLink = 'prapor.webp';
+  assert.equal(findItem(d, ['MRS', 'Transiluminador de pele LEDX']).id, 'l');
+  assert.equal(findItem(d, ['LEDX Skin Transi1luminator']).id, 'l');
+  assert.equal(findItem(d, ['Lug', 'MRS']), null);
+  const h = hoverInfo(d, findItem(d, ['Transiluminador de pele LEDX']));
+  assert.deepEqual([h.name, h.flea, h.trader.name, h.trader.image, h.perSlot, h.quests], ['Transiluminador de pele LEDX', 500000, 'Prapor', 'prapor.webp', 500000, ['Private Clinic']]);
 });
 
 test('medidor de passos acha as bandas dos passos', () => {

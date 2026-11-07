@@ -42,7 +42,8 @@ export function build(d) {
   return { guns, mods };
 }
 
-export function price(d, q) {
+// only: um item já achado (hover) em vez da busca por nome
+export function price(d, q, only) {
   q = (q ?? '').toLowerCase();
   const tasksByItem = new Map();
   for (const t of Object.values(d.tasks.data.tasks)) {
@@ -51,13 +52,70 @@ export function price(d, q) {
       for (const id of o.items ?? []) tasksByItem.set(id, [...(tasksByItem.get(id) ?? []), { name: tr(d.tasksEn, t.name) }]);
     }
   }
-  return items(d).map(i => ({ i, b: base(d, i) }))
-    .filter(({ b }) => b.name.toLowerCase().includes(q) || b.shortName.toLowerCase().includes(q))
+  return (only ? [only] : items(d)).map(i => ({ i, b: base(d, i) }))
+    .filter(({ i, b }) => only || [b.name, b.shortName, tr(d.itemsPt ?? {}, i.name)].some(n => n.toLowerCase().includes(q)))
     .slice(0, 20)
     .map(({ i, b }) => {
       const sellFor = (i.sellToTrader ?? []).map(o => { const n = traderOf(d, o.trader); return { priceRUB: o.priceRUB, vendor: { name: vendorName(n), normalizedName: n } }; });
       return { ...b, width: i.width, height: i.height, avg24hPrice: i.avg24hPrice, lastLowPrice: fleaPrice(i) || null, sellFor, usedInTasks: tasksByItem.get(i.id) ?? [] };
     });
+}
+
+// ---------- Hover: nome lido pelo OCR -> item ----------
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+function lev(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+const indexes = new WeakMap();
+function nameIndex(d) {
+  if (!indexes.has(d)) {
+    const idx = new Map();
+    for (const i of items(d)) {
+      for (const en of [d.itemsPt, d.itemsEn]) {
+        const n = norm(tr(en ?? {}, i.name));
+        if (n.length >= 5 && !idx.has(n)) idx.set(n, i); // nome curto (ex.: "MRS" da grade) gera falso positivo
+      }
+    }
+    indexes.set(d, idx);
+  }
+  return indexes.get(d);
+}
+
+// Acha o item pelas linhas lidas. Aceita até 15% de letras erradas, para erros do OCR.
+export function findItem(d, lines) {
+  const idx = nameIndex(d);
+  let best = null;
+  for (const line of lines) {
+    const n = norm(line);
+    if (n.length < 5) continue;
+    if (idx.has(n)) return idx.get(n);
+    for (const [name, item] of idx) {
+      if (Math.abs(name.length - n.length) > n.length * 0.15) continue;
+      const score = 1 - lev(n, name) / Math.max(n.length, name.length);
+      if (score >= 0.85 && (!best || score > best.score)) best = { score, item };
+    }
+  }
+  return best?.item ?? null;
+}
+
+export function hoverInfo(d, i) {
+  const [p] = price(d, null, i);
+  const top = p.sellFor.reduce((a, b) => (b.priceRUB > (a?.priceRUB ?? 0) ? b : a), null);
+  const trader = top && Object.values(d.traders.data).find(t => t.normalizedName === top.vendor.normalizedName);
+  const best = Math.max(p.lastLowPrice ?? 0, top?.priceRUB ?? 0);
+  return {
+    name: d.itemsPt ? tr(d.itemsPt, i.name) : p.name, flea: p.lastLowPrice,
+    trader: top && { name: top.vendor.name, price: top.priceRUB, image: trader?.imageLink },
+    perSlot: Math.round(best / (i.width * i.height)), quests: p.usedInTasks.map(t => t.name),
+  };
 }
 
 // Descobre a aba pela consulta GraphQL que ela manda.

@@ -5,7 +5,30 @@ export const BANDS = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1
 const pow = db => 10 ** (db / 10);
 const toDb = p => (p > 0 ? 10 * Math.log10(p) : -120);
 
-// Espectro em dB por bin (AnalyserNode) -> nível médio por banda de 1/3 de oitava
+// Espectro em dB por bin de um bloco de amostras (tamanho potência de 2), com janela Hann. FFT radix-2.
+export function spectrumDb(samples) {
+  const n = samples.length, re = new Float64Array(n), im = new Float64Array(n);
+  for (let i = 0; i < n; i++) re[i] = samples[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / n));
+  for (let i = 1, j = 0; i < n; i++) { // reordena por bits invertidos
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const a = -2 * Math.PI / len;
+    for (let i = 0; i < n; i += len) {
+      for (let k = 0; k < len / 2; k++) {
+        const wr = Math.cos(a * k), wi = Math.sin(a * k), u = i + k, v = u + len / 2;
+        const tr = re[v] * wr - im[v] * wi, ti = re[v] * wi + im[v] * wr;
+        re[v] = re[u] - tr; im[v] = im[u] - ti; re[u] += tr; im[u] += ti;
+      }
+    }
+  }
+  return Float32Array.from({ length: n / 2 }, (_, k) => 20 * Math.log10(Math.hypot(re[k], im[k]) / n + 1e-12));
+}
+
+// Espectro em dB por bin -> nível médio por banda de 1/3 de oitava
 export function toBands(db, sampleRate, fftSize) {
   return BANDS.map(f => {
     const lo = Math.ceil((f / 2 ** (1 / 6)) * fftSize / sampleRate), hi = Math.floor((f * 2 ** (1 / 6)) * fftSize / sampleRate);
