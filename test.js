@@ -134,7 +134,10 @@ test('screenshot com posição e rotação', () => {
 test('mapa no log', () => {
   const line = '2026-11-07 20:15:00.000|1.0|Info|application|TRACE-NetworkGameCreate profileStatus: \'Profileid: x, Status: Busy, RaidMode: Online, Ip: 1.2.3.4, Port: 17000, Location: bigmap, Sid: abc, GameMode: deathmatch, shortId: ABC123\'';
   assert.equal(mapFromLogLine(line), 'bigmap');
-  assert.equal(mapFromLogLine('2026-11-07 02:09:58.006|1.3.0.1.48558|Info|application|scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset'), 'bigmap');
+  assert.equal(mapFromLogLine('2026-11-07 02:10:25.507|1|Info|application|[Transit] Flag:None, RaidId:6aee, Count:0, Locations:bigmap -> '), 'bigmap');
+  assert.equal(mapFromLogLine('[Transit] Flag:None, Count:1, Locations:bigmap -> Interchange'), 'Interchange'); // transição: vale o último
+  assert.equal(mapFromLogLine('scene preset path:maps/shopping_mall.bundle rcid:Shopping_Mall.ScenesPreset.asset'), null);
+  assert.equal(mapKey('Sandbox_start'), 'ground-zero');
   assert.equal(mapFromLogLine('qualquer coisa Location: woods'), null);
   assert.equal(mapKey('RezervBase'), 'reserve');
   assert.equal(raidStartFromLogLine('2026-11-07 02:11:03.675|1.3.0.1.48558|Info|application|GameStarted:57.21(0) real:66.45(0) diff:9.23'), new Date(2026, 10, 7, 2, 11, 3, 675).getTime());

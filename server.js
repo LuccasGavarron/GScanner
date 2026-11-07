@@ -227,7 +227,9 @@ function eqAuto(on) {
 let logFile, offset = 0;
 function pollLogs() {
   try {
-    const dir = fs.readdirSync(LOGS).filter(d => d.startsWith('log_')).sort().at(-1);
+    // mais nova pela data de modificação: o nome traz a hora sem zero ("2-00-25" viria depois de "12-38-34")
+    const dir = fs.readdirSync(LOGS).filter(d => d.startsWith('log_'))
+      .map(d => ({ d, t: fs.statSync(path.join(LOGS, d)).mtimeMs })).sort((a, b) => b.t - a.t)[0]?.d;
     const file = dir && fs.readdirSync(path.join(LOGS, dir)).find(f => /application(_\d+)?\.log$/.test(f));
     if (!file) return;
     const full = path.join(LOGS, dir, file);

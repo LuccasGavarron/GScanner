@@ -12,11 +12,12 @@ export function parseScreenshot(name) {
   return { x, y, z, yaw };
 }
 
-// Mapa no application.log. 1.0+: "scene preset path:maps/customs_preset.bundle rcid:bigmap.scenespreset.asset"
-// Antes da 1.0: "... TRACE-NetworkGameCreate profileStatus ... Location: bigmap, ..."
+// Mapa no application.log, pelo nome padrão (nameId). Toda raid tem "[Transit] ... Locations:bigmap -> "
+// (com transição, o mapa atual é o último da lista); raid online também tem
+// "TRACE-NetworkGameCreate ... Location: Interchange,". A linha "rcid:" usa nome de cena (Shopping_Mall) e não serve.
 export function mapFromLogLine(line) {
-  const scene = /rcid:(\w+)\.scenespreset/.exec(line);
-  if (scene) return scene[1];
+  const transit = /\[Transit\].*Locations:(.*)$/.exec(line);
+  if (transit) return transit[1].split('->').map(s => s.trim()).filter(Boolean).at(-1) ?? null;
   if (!line.includes('TRACE-NetworkGameCreate')) return null;
   return /Location: ([^,\s]+)/.exec(line)?.[1] ?? null;
 }
@@ -33,7 +34,7 @@ const MAP_IDS = {
   bigmap: 'customs', factory4_day: 'factory', factory4_night: 'factory', woods: 'woods',
   shoreline: 'shoreline', interchange: 'interchange', rezervbase: 'reserve', laboratory: 'the-lab',
   lighthouse: 'lighthouse', tarkovstreets: 'streets-of-tarkov', sandbox: 'ground-zero',
-  sandbox_high: 'ground-zero', labyrinth: 'the-labyrinth',
+  sandbox_high: 'ground-zero', sandbox_start: 'ground-zero', labyrinth: 'the-labyrinth',
 };
 export const mapKey = id => MAP_IDS[id.toLowerCase()] ?? id.toLowerCase();
 
