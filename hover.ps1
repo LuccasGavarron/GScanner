@@ -66,12 +66,12 @@ while ($true) {
   if (($n++ % 50) -eq 0 -and $env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
   if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') { Emit '[]'; Start-Sleep -Milliseconds 200; continue } # fora do jogo: esconde o cartão
   if ([Win]::CursorVisible()) {
-    # Inventário: região em volta do cursor; pega a dica do item (ao lado) e o rótulo na grade (acima, até 330 px)
+    # Inventário: só a região da dica do jogo, colada ao cursor (à direita, um pouco acima)
     Start-Sleep -Milliseconds 80
     $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
-    $bmp = New-Object Drawing.Bitmap 1000, 420
-    $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 300, $p.Y - 340, 0, 0, $bmp.Size); $g.Dispose()
-    $cx = 300; $cy = 340; $raid = $false
+    $bmp = New-Object Drawing.Bitmap 760, 240
+    $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 40, $p.Y - 160, 0, 0, $bmp.Size); $g.Dispose()
+    $cx = 40; $cy = 160; $raid = $false
   } else {
     # Raid (o jogo esconde o cursor): retângulo no centro, onde aparece o nome curto do item mirado, abaixo da mira
     Start-Sleep -Milliseconds 150

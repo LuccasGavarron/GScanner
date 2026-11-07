@@ -152,9 +152,8 @@ function watchHover() {
         let item, how;
         if (raid) [item, how] = [offline.raidPick(d, boxes), 'mira']; // em raid: nome curto abaixo da mira
         else {
-          // inventário: nome completo da dica (colada ao cursor) vence; sem dica ainda, o rótulo da grade dá o item na hora
-          const byName = offline.findItem(d, offline.nearCursor(boxes).map(b => b[0]));
-          [item, how] = [byName ?? offline.pickByLabel(d, boxes), byName ? 'dica' : 'rótulo'];
+          // inventário: só a dica do jogo, colada ao cursor; ela só existe com o mouse em cima de um item
+          [item, how] = [offline.findItem(d, offline.nearCursor(boxes).map(b => b[0])), 'dica'];
         }
         hoverLog(`${item ? how + ' ' + item.normalizedName : '-'} <= ${l.trim()}`);
         if (item && item.id !== lastId) { lastId = item.id; publish('hover', { ...offline.hoverInfo(d, item), raid }); }
