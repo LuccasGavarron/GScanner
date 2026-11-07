@@ -53,6 +53,10 @@ async function warm(m, template) {
   await Promise.all(Array.from({ length: 2 }, next)); // só 2: deixa conexões livres para os tiles da tela
 }
 
+// Ícones oficiais do mapa do tarkov.dev (extração, cadeado, perigo, container...)
+// small: some com o mapa afastado (containers, spawns, loot), para não virar uma sopa de ícones
+const pin = (name, size = 24, small = false) => L.icon({ iconUrl: `https://tarkov.dev/maps/interactive/${name}.png`, iconSize: [size, size], iconAnchor: [size / 2, size / 2], className: small ? 'ic-small' : '' });
+
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const icon = (cls, html = '') => L.divIcon({ className: '', html: `<div class="${cls}">${html}</div>`, iconSize: [16, 16] });
 
@@ -63,8 +67,8 @@ function drawExtracts() {
     if (!show.includes(e.faction)) continue;
     const dist = lastPos && Math.hypot(e.x - lastPos.x, e.z - lastPos.z);
     const label = dist ? `${e.name} · ${Math.round(dist)} m · ${mmss(dist / SPEED)}` : e.name;
-    const m = L.circleMarker([e.z, e.x], { radius: 7, color: '#000', weight: 1, fillColor: EX_COLOR[e.faction], fillOpacity: 1 })
-      .bindTooltip(label, { permanent: true, direction: 'right', className: 'ex-label' }).addTo(extractLayer);
+    const m = L.marker([e.z, e.x], { icon: pin(`extract_${e.faction}`, 30) })
+      .bindTooltip(label, { permanent: true, direction: 'right', offset: [14, 0], className: 'ex-label' }).addTo(extractLayer);
     detail(m, `<b>${e.name}</b><br>${EX_NAME[e.faction]}${e.needsSwitch ? '<br>⚡ Precisa acionar uma alavanca antes' : ''}${dist ? `<br>${Math.round(dist)} m · uns ${mmss(dist / SPEED)} até lá` : ''}`);
   }
 }
@@ -98,7 +102,6 @@ const layerOn = JSON.parse(localStorage.getItem('gs-layers') ?? '{"Bosses":true,
 function buildLayers(key) {
   const d = extracts[key];
   if (!d) return;
-  const dot = (p, color, r = 4) => L.circleMarker([p.z, p.x], { radius: r, color: '#000', weight: 1, fillColor: color, fillOpacity: 0.9 });
   const groups = {
     Bosses: d.bosses.map(b => {
       const m = L.marker([b.z, b.x], { icon: L.divIcon({ className: '', html: `<div class="boss">${img(b.portrait)}</div>`, iconSize: [30, 30] }) });
@@ -106,21 +109,25 @@ function buildLayers(key) {
       return m;
     }),
     Chaves: d.locks.map(l => {
-      const m = dot(l, '#fd3', 5);
+      const m = L.marker([l.z, l.x], { icon: pin(/cart[aã]o|keycard/i.test(l.key) ? 'keycard' : 'lock', 20) });
       detail(m, `<div class="row">${img(l.icon)}<div><b>Porta trancada</b><br>${l.key}${l.price ? `<br>Flea: ${l.price.toLocaleString('pt-BR')} ₽` : ''}${l.needsPower ? '<br>⚡ Precisa de energia' : ''}</div></div>`);
       return m;
     }),
     Perigos: d.hazards.map(h => {
-      const p = L.polygon(h.outline.map(o => [o.z, o.x]), { color: '#f33', weight: 1, fillOpacity: 0.25 });
-      detail(p, `<b>${h.name === 'Landmine' ? 'Campo minado' : h.name}</b>`);
-      return p;
+      const label = `<b>${h.name === 'Landmine' ? 'Campo minado' : h.name}</b>`;
+      const p = L.polygon(h.outline.map(o => [o.z, o.x]), { color: '#f33', weight: 1, fillOpacity: 0.2, dashArray: '4 4' });
+      const c = p.getBounds().getCenter();
+      const m = L.marker(c, { icon: pin('hazard', 26) });
+      detail(p, label);
+      detail(m, label);
+      return L.layerGroup([p, m]);
     }),
-    Containers: d.containers.map(c => { const m = dot(c, '#bbb', 3); detail(m, c.name); return m; }),
-    Alavancas: d.switches.map(s => { const m = dot(s, '#f80', 5); detail(m, '<b>Alavanca</b><br>Abre extração ou porta'); return m; }),
-    'Armas fixas': d.weapons.map(w => { const m = dot(w, '#e44', 5); detail(m, `<b>${w.name}</b>`); return m; }),
-    'Spawns de jogadores': d.spawns.map(s => { const pmc = s.sides.includes('pmc') || s.sides.includes('all'); const m = dot(s, pmc ? '#4c4' : '#4af', 4); detail(m, `<b>Spawn de ${pmc ? 'PMC' : 'Scav'}</b>`); return m; }),
+    Containers: d.containers.map(c => { const m = L.marker([c.z, c.x], { icon: pin(`container_${c.type}`, 18, true) }); detail(m, c.name); return m; }),
+    Alavancas: d.switches.map(s => { const m = L.marker([s.z, s.x], { icon: pin('switch', 22) }); detail(m, '<b>Alavanca</b><br>Abre extração ou porta'); return m; }),
+    'Armas fixas': d.weapons.map(w => { const m = L.marker([w.z, w.x], { icon: pin('stationarygun', 22) }); detail(m, `<b>${w.name}</b>`); return m; }),
+    'Spawns de jogadores': d.spawns.map(s => { const pmc = s.sides.includes('pmc') || s.sides.includes('all'); const m = L.marker([s.z, s.x], { icon: pin(pmc ? 'spawn_pmc' : 'spawn_scav', 18, true) }); detail(m, `<b>Spawn de ${pmc ? 'PMC' : 'Scav'}</b>`); return m; }),
     'Loot valioso': (d.loot ?? []).map(l => ({ l, its: l.i.map(k => d.lootItems[k]).sort((a, b) => b.price - a.price) })).filter(x => x.its[0]?.price >= 40000).map(({ l, its }) => {
-      const m = L.marker([l.z, l.x], { icon: L.divIcon({ className: '', html: '<div class="loot"></div>', iconSize: [12, 12] }) });
+      const m = L.marker([l.z, l.x], { icon: pin('loose_loot', 20, true) });
       detail(m, `<b>Pode aparecer aqui</b>${its.slice(0, 5).map(it => `<div class="row">${img(it.icon)}<span>${it.name}<br><span class="muted">${it.price ? it.price.toLocaleString('pt-BR') + ' ₽' : 'sem flea'}</span></span></div>`).join('')}${its.length > 5 ? `<span class="muted">e mais ${its.length - 5}</span>` : ''}`);
       return m;
     }),
@@ -218,6 +225,9 @@ function showMap(key) {
     base.once('load', () => warm(m, local(m.tilePath))); // baixa o resto depois que a tela carregou
   }
   leaflet.fitBounds(bounds);
+  const far = () => leaflet.getContainer().classList.toggle('zoom-far', leaflet.getZoom() < m.minZoom + 1.5);
+  leaflet.on('zoomend', far);
+  far();
   const places = L.layerGroup().addTo(leaflet);
   for (const l of m.labels ?? []) {
     L.marker([l.position[1], l.position[0]], { icon: L.divIcon({ className: '', html: `<span class="place">${l.text}</span>`, iconSize: null }), interactive: false }).addTo(places);
@@ -239,7 +249,7 @@ function showPosition(p) {
   // mesma correção de rotação que o tarkov.dev usa no marcador do jogador
   let add = current.coordinateRotation;
   if (add === 90 || add === 270) add += 180;
-  const meIcon = L.divIcon({ className: '', html: `<div class="me" style="transform: rotate(${p.yaw + add}deg)"></div>`, iconSize: [16, 20] });
+  const meIcon = L.divIcon({ className: '', html: `<img src="https://tarkov.dev/maps/interactive/player-position.png" class="me" style="transform: rotate(${p.yaw + add}deg)">`, iconSize: [28, 28] });
   const ll = [p.z, p.x];
   me ? me.setLatLng(ll).setIcon(meIcon) : (me = L.marker(ll, { icon: meIcon, interactive: false }).addTo(leaflet));
   const floor = floorAt(current.layers, p);

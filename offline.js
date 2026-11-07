@@ -89,7 +89,7 @@ export function mapLayers(maps, en, d, mapKey) {
         })));
       }),
       switches: m.switches.map(s => pos(s.position)),
-      containers: m.lootContainers.map(c => ({ name: t(maps.data.lootContainers[c.lootContainer]?.name), ...pos(c.position) })),
+      containers: m.lootContainers.map(c => ({ name: t(maps.data.lootContainers[c.lootContainer]?.name), type: maps.data.lootContainers[c.lootContainer]?.normalizedName, ...pos(c.position) })),
       weapons: m.stationaryWeapons.map(w => ({ name: t(maps.data.stationaryWeapons[w.stationaryWeapon]?.name), ...pos(w.position) })),
       spawns: m.spawns.filter(s => s.categories.includes('player')).map(s => ({ sides: s.sides, ...pos(s.position) })),
     };

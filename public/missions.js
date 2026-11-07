@@ -10,8 +10,6 @@ const save = () => {
 };
 const img = (src, cls = '') => (src ? `<img src="${src}" class="${cls}" alt="">` : '');
 const mapName = k => k?.replace(/-/g, ' ') ?? 'qualquer mapa';
-// símbolo do marcador pelo tipo de objetivo
-const ZONE_ICON = { visit: '👁', mark: '📍', plantItem: '⬇', plantQuestItem: '⬇', shoot: '✛', findItem: '?', extract: '⇥' };
 const itemLine = it => `<span class="chip">${img(it.icon)}${it.name}${it.price ? ` · ${rub(it.price)}` : ''}</span>`;
 
 // ---------- Aba Missões: lista com filtros ----------
@@ -72,7 +70,7 @@ function drawOnMap() {
         const p = L.polygon(z.outline.map(v => [v.z, v.x]), { color: '#b6f', weight: 2, fillOpacity: 0.2 }).addTo(overlay);
         detail(p, tip);
         // área pequena some no zoom afastado: marcador no centro sempre visível
-        const m = L.marker([z.z, z.x], { icon: L.divIcon({ className: '', html: `<div class="qmark zone">${ZONE_ICON[o.type] ?? '!'}</div>`, iconSize: [26, 26] }) }).addTo(overlay);
+        const m = L.marker([z.z, z.x], { icon: L.icon({ iconUrl: 'https://tarkov.dev/maps/interactive/quest_objective.png', iconSize: [28, 28], className: 'qicon' }) }).addTo(overlay);
         m.on('click', () => flyTo(z.x, z.z));
         detail(m, tip);
       }
@@ -87,7 +85,7 @@ function drawOnMap() {
       for (const l of info.loot) {
         const its = l.i.map(k => info.lootItems[k]).filter(it => want.has(it.id));
         if (!its.length) continue;
-        const m = L.marker([l.z, l.x], { icon: L.divIcon({ className: '', html: '<div class="loot qloot"></div>', iconSize: [12, 12] }) }).addTo(overlay);
+        const m = L.marker([l.z, l.x], { icon: L.icon({ iconUrl: 'https://tarkov.dev/maps/interactive/loose_loot.png', iconSize: [22, 22], className: 'qicon' }) }).addTo(overlay);
         detail(m, `${tip}<br><b>Pode aparecer aqui:</b>${its.map(it => `<div class="row">${img(it.icon)}<span>${it.name}</span></div>`).join('')}`);
       }
     }
