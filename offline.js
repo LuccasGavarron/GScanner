@@ -224,3 +224,12 @@ export function answer(d, { query, variables }) {
   if (query.includes('items(name:')) return { items: price(d, variables?.q) };
   return null;
 }
+
+// ---------- Código de convite do grupo: "GS-" + base64url de { u: endereço do anfitrião, k: senha } ----------
+export const encodeInvite = (u, k) => 'GS-' + Buffer.from(JSON.stringify({ u, k })).toString('base64url');
+export function decodeInvite(code) {
+  try {
+    const { u, k } = JSON.parse(Buffer.from(String(code).trim().replace(/^GS-/, ''), 'base64url').toString());
+    return /^https?:\/\/[\w.\-[\]:]+$/.test(u) && typeof k === 'string' && k.length >= 8 && k.length <= 64 ? { u, k } : null;
+  } catch { return null; }
+}

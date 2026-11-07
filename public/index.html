@@ -30,7 +30,14 @@
   #raid-timer { color: #fd6; }
   #tab-map { position: relative; }
   #task-panel { position: absolute; top: 96px; left: 52px; z-index: 900; width: 320px; max-height: calc(100% - 120px); overflow: auto; background: rgba(27, 27, 27, .93); border: 1px solid #444; padding: 8px 10px; font-size: 13px; }
-  #task-panel[hidden] { display: none; }
+  #task-panel[hidden], #squad-panel[hidden] { display: none; }
+  #squad-panel { position: absolute; top: 96px; right: 230px; z-index: 950; width: 300px; background: rgba(27, 27, 27, .96); border: 1px solid #444; padding: 10px; font-size: 13px; }
+  #squad-panel label { display: block; margin: 6px 0; }
+  #squad-panel .row { display: flex; gap: 6px; }
+  #squad-panel .row input { flex: 1; min-width: 0; }
+  #squad-panel button { background: #9a8866; color: #111; border: 0; padding: 5px 10px; cursor: pointer; }
+  #squad-panel button.link { background: none; color: #9a8866; padding: 0; text-decoration: underline; }
+  #squad-panel p { margin: 6px 0; }
   .ptask { border-top: 1px solid #333; margin-top: 6px; padding-top: 6px; }
   .ptask label { display: block; margin: 3px 0; cursor: pointer; }
   .ptask label.done { color: #777; text-decoration: line-through; }
@@ -103,10 +110,12 @@
     <label><input id="follow" type="checkbox" checked> Seguir personagem</label>
     <b id="raid-timer" hidden></b>
     <button id="clear-pings">Limpar pings</button>
+    <button id="squad-btn">Grupo</button>
     <span class="muted" id="map-status"></span>
   </div>
   <div id="map"></div>
   <div id="task-panel" hidden></div>
+  <div id="squad-panel" hidden></div>
 </section>
 
 <section id="tab-tasks" class="tab">

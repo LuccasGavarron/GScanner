@@ -33,7 +33,16 @@ test('FFT acha o tom certo', () => {
   const bands = toBands(db, rate, n);
   assert.equal(BANDS[bands.indexOf(Math.max(...bands))], 3150); // 3 kHz cai na banda de 3,15 kHz
 });
-import { answer, findItem, hoverInfo } from './offline.js';
+import { answer, findItem, hoverInfo, encodeInvite, decodeInvite } from './offline.js';
+
+test('código de convite ida e volta, e recusa lixo', () => {
+  const code = encodeInvite('http://100.109.154.42:7777', 'senha-do-grupo');
+  assert.ok(code.startsWith('GS-'));
+  assert.deepEqual(decodeInvite(' ' + code + ' '), { u: 'http://100.109.154.42:7777', k: 'senha-do-grupo' });
+  assert.equal(decodeInvite('GS-lixo'), null);
+  assert.equal(decodeInvite(encodeInvite('javascript:alert(1)', 'senha-do-grupo')), null); // endereço que não é http
+  assert.equal(decodeInvite(encodeInvite('http://1.2.3.4:7777', 'curta')), null); // senha curta demais
+});
 
 test('cópia JSON vira resposta das abas', () => {
   const d = {

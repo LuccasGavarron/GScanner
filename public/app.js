@@ -5,6 +5,7 @@ import { initBuild } from './build.js';
 import { initPrice } from './price.js';
 import { initSound } from './soundtab.js';
 import { initMissions } from './missions.js';
+import { initSquad } from './squad.js';
 
 // Abas
 for (const b of document.querySelectorAll('nav button')) {
@@ -22,6 +23,7 @@ initBuild();
 initPrice();
 initSound();
 initMissions();
+initSquad();
 
 // servidor atualizou pelo GitHub e reiniciou: recarrega a página para pegar o código novo
 let version;

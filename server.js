@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { execSync, execFile, spawn } from 'node:child_process';
 import { parseScreenshot, mapFromLogLine, mapKey, raidStartFromLogLine } from './public/shared.js';
 import * as offline from './offline.js';
+import { encodeInvite, decodeInvite } from './offline.js';
 import { spectrumDb, toBands, footstepProfile, nearestProfile } from './public/sound.js';
 
 const PORT = Number(process.env.PORT) || 7777;
@@ -53,22 +54,51 @@ function squadSend() {
   fetch(SQUAD.url + '/squad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...me, key: SQUAD.key }), signal: AbortSignal.timeout(5000) })
     .catch(() => { /* anfitrião fora do ar: tenta de novo no próximo envio */ });
 }
-async function squadListen() { // amigo: recebe a lista do anfitrião
-  try {
-    const r = await fetch(`${SQUAD.url}/squad/events?key=${encodeURIComponent(SQUAD.key ?? '')}`);
-    if (!r.ok) throw new Error(r.status);
-    let buf = '';
-    for await (const chunk of r.body) {
-      buf += Buffer.from(chunk).toString();
-      const parts = buf.split('\n\n');
-      buf = parts.pop();
-      for (const p of parts) {
-        const msg = JSON.parse(p.replace(/^data: /, ''));
-        if (msg.type === 'squad') publish('squad', msg.data);
+// amigo: recebe a lista do anfitrião. Trocar de grupo aborta a conexão antiga e abre outra.
+let listen = null;
+async function squadListen() {
+  listen?.abort();
+  if (!SQUAD.url) return;
+  const ctl = listen = new AbortController();
+  while (!ctl.signal.aborted) {
+    try {
+      const r = await fetch(`${SQUAD.url}/squad/events?key=${encodeURIComponent(SQUAD.key ?? '')}`, { signal: ctl.signal });
+      if (!r.ok) throw new Error(r.status);
+      let buf = '';
+      for await (const chunk of r.body) {
+        buf += Buffer.from(chunk).toString();
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const p of parts) {
+          const msg = JSON.parse(p.replace(/^data: /, ''));
+          if (msg.type === 'squad') publish('squad', msg.data);
+        }
       }
-    }
-  } catch { /* cai e reconecta */ }
-  setTimeout(squadListen, 5000);
+    } catch { /* cai e reconecta */ }
+    await new Promise(r => setTimeout(r, 5000));
+  }
+}
+
+// Código de convite: "GS-" + base64url de { u: endereço do anfitrião, k: senha }. Gerar e usar só pelo próprio PC.
+const isLocal = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+function hostAddress() { // IP do Tailscale se houver (amigos de outras casas), senão o da rede local
+  try {
+    const ip = execSync('tailscale ip -4', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n')[0];
+    if (/^100\./.test(ip)) return ip;
+  } catch { /* sem Tailscale */ }
+  return Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address ?? 'localhost';
+}
+function saveSquad(next) {
+  Object.assign(SQUAD, next);
+  for (const [k, c] of [['name', 'squadName'], ['key', 'squadKey'], ['url', 'squadUrl']]) {
+    if (SQUAD[k]) cfg[c] = SQUAD[k]; else delete cfg[c];
+  }
+  fs.writeFileSync(path.join(import.meta.dirname, 'config.json'), JSON.stringify(cfg, null, 2) + '\n');
+  squad.clear();
+  publish('squad', []);
+  publish('me', SQUAD.name);
+  squadListen();
+  squadSend();
 }
 
 function readJson(req, max, cb) {
@@ -350,6 +380,23 @@ const server = http.createServer((req, res) => {
       ok();
     });
   }
+  if (/^\/squad\/(status|host|join|leave)$/.test(req.url) && req.method === 'POST') { // grupo pela página, só deste PC
+    if (!isLocal(req)) return res.writeHead(403).end();
+    return readJson(req, 2000, b => {
+      const name = typeof b?.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 20) : SQUAD.name;
+      if (req.url === '/squad/host') saveSquad({ name, url: undefined, key: !SQUAD.url && SQUAD.key ? SQUAD.key : crypto.randomBytes(9).toString('base64url') });
+      if (req.url === '/squad/join') {
+        const inv = decodeInvite(b?.code);
+        if (!inv || !name) return res.writeHead(400, { 'Content-Type': 'application/json' }).end('{"error":"Código inválido ou nome vazio."}');
+        saveSquad({ name, url: inv.u, key: inv.k });
+      }
+      if (req.url === '/squad/leave') saveSquad({ url: undefined, key: undefined });
+      const host = !SQUAD.url && !!SQUAD.key;
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
+        name: SQUAD.name ?? '', host, joined: !!SQUAD.url, code: host ? encodeInvite(`http://${hostAddress()}:${PORT}`, SQUAD.key) : null,
+      }));
+    });
+  }
   if (req.url === '/squad' && req.method === 'POST') { // posição de um amigo
     return readJson(req, 10_000, m => res.writeHead(!m || !keyOk(m.key) ? 403 : squadUpdate(m) ? 200 : 400).end());
   }
@@ -390,7 +437,7 @@ const server = http.createServer((req, res) => {
   if (SQUAD.name) {
     publish('me', SQUAD.name);
     console.log(`Squad: ${SQUAD.name} -> ${SQUAD.url ?? 'anfitrião (este PC)'}`);
-    if (SQUAD.url) squadListen();
-    setInterval(squadSend, 30_000); // mantém o nome vivo no grupo mesmo parado
+    squadListen();
   }
+  setInterval(squadSend, 30_000); // mantém o nome vivo no grupo mesmo parado (sem grupo, não faz nada)
 });
