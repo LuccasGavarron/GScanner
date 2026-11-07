@@ -137,7 +137,9 @@ function watchHover() {
     for (const l of lines) {
       try {
         const d = await offlineData();
-        const item = offline.findItem(d, [].concat(JSON.parse(l) ?? []));
+        const boxes = [].concat(JSON.parse(l) ?? []);
+        // nome completo da dica do jogo vence; sem dica ainda, o rótulo curto da grade dá o item na hora
+        const item = offline.findItem(d, boxes.map(b => (Array.isArray(b) ? b[0] : b))) ?? offline.pickByLabel(d, boxes.filter(Array.isArray));
         if (item && item.id !== lastId) { lastId = item.id; publish('hover', offline.hoverInfo(d, item)); }
         if (!item && lastId) { lastId = null; publish('hover', null); } // dica sumiu: esconde o cartão
       } catch { /* linha incompleta ou sem dados: ignora */ }

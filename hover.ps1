@@ -31,11 +31,21 @@ function Read-Text([Drawing.Bitmap]$bmp) {
   $null = Await ($w.StoreAsync()) ([uint32]); $ras.Seek(0)
   $dec = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($ras)) ([Windows.Graphics.Imaging.BitmapDecoder])
   $sb = Await ($dec.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-  (Await ($engine.RecognizeAsync($sb)) ([Windows.Media.Ocr.OcrResult])).Lines | ForEach-Object { $_.Text }
+  (Await ($engine.RecognizeAsync($sb)) ([Windows.Media.Ocr.OcrResult])).Lines
+}
+# Cada linha vira [texto, esquerda, topo, direita, base], com o cursor em (0, 0)
+function Lines-Json($lines, [int]$cx, [int]$cy) {
+  $parts = foreach ($l in $lines) {
+    $r = $l.Words | ForEach-Object { $_.BoundingRect }
+    $x1 = ($r | Measure-Object X -Minimum).Minimum; $y1 = ($r | Measure-Object Y -Minimum).Minimum
+    $x2 = ($r | ForEach-Object { $_.X + $_.Width } | Measure-Object -Maximum).Maximum; $y2 = ($r | ForEach-Object { $_.Y + $_.Height } | Measure-Object -Maximum).Maximum
+    '[' + (ConvertTo-Json -Compress $l.Text) + ",$([int]($x1 - $cx)),$([int]($y1 - $cy)),$([int]($x2 - $cx)),$([int]($y2 - $cy))]"
+  }
+  '[' + ($parts -join ',') + ']'
 }
 
 # Arquivo de imagem como argumento: lê uma vez e sai (usado no teste).
-if ($args.Count) { Read-Text ([Drawing.Bitmap]::new($args[0])) | ConvertTo-Json -Compress; exit }
+if ($args.Count) { $b = [Drawing.Bitmap]::new($args[0]); Lines-Json (Read-Text $b) ([int]$args[1]) ([int]$args[2]); exit } # teste: imagem, x e y do cursor nela
 
 $last = ''; $lastSig = 0; $n = 0
 while ($true) {
@@ -46,13 +56,12 @@ while ($true) {
     continue
   }
   $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
-  # A dica do item aparece ao lado do cursor: região de 900x140 em volta dele
-  $bmp = New-Object Drawing.Bitmap 900, 140
-  $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 200, $p.Y - 90, 0, 0, $bmp.Size); $g.Dispose()
+  # Região em volta do cursor: pega a dica do item (ao lado) e o rótulo do item na grade (acima, até 330 px para itens altos)
+  $bmp = New-Object Drawing.Bitmap 1000, 420
+  $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 300, $p.Y - 340, 0, 0, $bmp.Size); $g.Dispose()
   $sig = [Win]::Sig($bmp)
   if ($sig -eq $lastSig) { $bmp.Dispose(); continue }
   $lastSig = $sig
-  $lines = @(Read-Text $bmp); $bmp.Dispose()
-  $json = ConvertTo-Json -Compress -InputObject $lines
+  $json = Lines-Json @(Read-Text $bmp) 300 340; $bmp.Dispose()
   if ($json -ne $last) { $last = $json; [Console]::Out.WriteLine($json); [Console]::Out.Flush() }
 }

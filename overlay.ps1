@@ -32,12 +32,22 @@ public class Card : Form {
     slot.ForeColor = Color.Gray; quests.ForeColor = Color.FromArgb(255, 210, 100); ammoHead.ForeColor = magHead.ForeColor = Color.Gray;
     ammoHead.Text = "Munição (penetração / dano)"; magHead.Text = "Pentes";
   }
+  // imagens já baixadas ficam na memória: o próximo hover do mesmo item aparece na hora
+  static readonly Dictionary<string, Image> Cache = new Dictionary<string, Image>();
+  static void Fetch(PictureBox p, string url) {
+    Image img;
+    if (Cache.TryGetValue(url, out img)) { p.Image = img; return; }
+    System.ComponentModel.AsyncCompletedEventHandler done = null;
+    done = (s, e) => { p.LoadCompleted -= done; if (e.Error == null && !e.Cancelled && p.Image != null) Cache[url] = p.Image; };
+    p.LoadCompleted += done;
+    p.LoadAsync(url);
+  }
   static string Rub(object v) { return v == null ? "—" : string.Format(BR, "{0:N0} ₽", Convert.ToDouble(v)); }
   // um quadrado com o ícone e duas linhas de texto embaixo
   static Control Tile(string icon, string text) {
     var p = new Panel { Size = new Size(66, 74), Margin = new Padding(0, 0, 4, 0) };
     var img = new PictureBox { Size = new Size(48, 48), Location = new Point(9, 0), SizeMode = PictureBoxSizeMode.Zoom };
-    img.LoadAsync(icon);
+    Fetch(img, icon);
     var l = new Label { Text = text, Location = new Point(0, 48), Size = new Size(66, 26), ForeColor = Ink, Font = new Font("Segoe UI", 7.5f), TextAlign = ContentAlignment.TopCenter };
     p.Controls.Add(img); p.Controls.Add(l);
     return p;
@@ -65,7 +75,7 @@ public class Card : Form {
     Fill(ammoRow, ammoHead, h.Contains("ammo") ? h["ammo"] as ArrayList : null, a => a["name"] + "\n" + a["pen"] + " / " + a["dmg"]);
     Fill(magRow, magHead, h.Contains("mags") ? h["mags"] as ArrayList : null, m => m["name"] + "\n" + m["cap"] + " balas");
     pic.Image = null;
-    if (t != null && t["portrait"] != null) pic.LoadAsync((string)t["portrait"]);
+    if (t != null && t["portrait"] != null) Fetch(pic, (string)t["portrait"]);
     ResumeLayout(); PerformLayout();
     var c = Cursor.Position; var area = Screen.FromPoint(c).WorkingArea;
     int x = c.X + 28, y = c.Y + 28;

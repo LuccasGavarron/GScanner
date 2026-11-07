@@ -187,6 +187,29 @@ export function findItem(d, lines) {
   return best?.item ?? null;
 }
 
+// Rótulo curto do item na grade ("Berkut", "MRS"): aparece na hora, antes da dica do jogo (que demora ~0,5 s).
+// boxes: [texto, esquerda, topo, direita, base] com o cursor em (0, 0). O rótulo fica no canto de cima à direita
+// do item: acima do cursor e com a borda direita à direita dele. Fica o mais próximo acima; empate, o mais à esquerda.
+const shortIndexes = new WeakMap();
+export function pickByLabel(d, boxes) {
+  if (!shortIndexes.has(d)) {
+    const idx = new Map();
+    for (const i of items(d)) {
+      for (const en of [d.itemsPt, d.itemsEn]) {
+        const n = norm(tr(en ?? {}, i.shortName));
+        if (n.length < 2) continue;
+        const prev = idx.get(n);
+        idx.set(n, prev && prev !== i ? 'ambíguo' : i); // nome curto repetido: não dá para saber qual é
+      }
+    }
+    shortIndexes.set(d, idx);
+  }
+  const idx = shortIndexes.get(d);
+  const hits = boxes.filter(([t, , top, right]) => top <= 0 && top >= -330 && right >= 0 && right <= 330 && idx.get(norm(t)) instanceof Object && idx.get(norm(t)) !== 'ambíguo')
+    .sort((a, b) => b[2] - a[2] || a[3] - b[3]);
+  return hits.length ? idx.get(norm(hits[0][0])) : null;
+}
+
 export function hoverInfo(d, i) {
   const [p] = price(d, null, i);
   const top = p.sellFor.reduce((a, b) => (b.priceRUB > (a?.priceRUB ?? 0) ? b : a), null);
