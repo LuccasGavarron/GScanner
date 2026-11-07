@@ -1,4 +1,4 @@
-# Lê o texto perto do mouse quando o Tarkov está em primeiro plano (OCR do Windows) e escreve uma linha JSON por leitura.
+﻿# Lê o texto perto do mouse quando o Tarkov está em primeiro plano (OCR do Windows) e escreve uma linha JSON por leitura.
 # Não toca no processo do jogo: só captura a tela, como um print.
 Add-Type -AssemblyName System.Drawing, System.Runtime.WindowsRuntime
 Add-Type @'

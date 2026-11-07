@@ -357,6 +357,8 @@ http.createServer((req, res) => {
   console.log('Logs:', LOGS);
   watchShots();
   watchHover();
+  // cartão por cima do jogo (Tarkov em janela sem borda); desliga com "overlay": false no config.json
+  if (process.platform === 'win32' && cfg.overlay !== false) spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(import.meta.dirname, 'overlay.ps1'), '-Port', String(PORT), '-ParentPid', String(process.pid)], { stdio: 'ignore' });
   setInterval(pollLogs, 2000);
   if (SQUAD.name) {
     publish('me', SQUAD.name);

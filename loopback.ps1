@@ -1,4 +1,4 @@
-# Grava o som que sai pela saída padrão do Windows (WASAPI loopback, o mesmo que o OBS usa).
+﻿# Grava o som que sai pela saída padrão do Windows (WASAPI loopback, o mesmo que o OBS usa).
 # Saída: uma linha "RATE <hz>" e depois amostras mono float32 little-endian, sem parar, até ser encerrado.
 Add-Type @'
 using System; using System.IO; using System.Threading; using System.Runtime.InteropServices;

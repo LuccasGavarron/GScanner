@@ -15,7 +15,7 @@ Sem tecla Print Screen: no jogo, troque o atalho de screenshot para outra tecla 
 2. Rode `npm start` nesta pasta.
 3. Abra `http://localhost:7777`. O terminal também mostra o endereço para o celular na mesma rede.
 
-Para abrir sozinho com o Windows: crie na pasta Inicializar (`shell:startup`) um atalho para `wscript.exe "<pasta do GScanner>start-hidden.vbs"`.
+Para abrir sozinho com o Windows: crie na pasta Inicializar (`shell:startup`) um atalho para `wscript.exe "<pasta do GScanner>\start-hidden.vbs"`.
 
 Se as pastas do jogo forem outras, defina `EFT_SCREENSHOTS` e `EFT_LOGS` antes do `npm start`.
 

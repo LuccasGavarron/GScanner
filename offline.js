@@ -192,7 +192,7 @@ export function hoverInfo(d, i) {
   const best = Math.max(p.lastLowPrice ?? 0, top?.priceRUB ?? 0);
   return {
     name: d.itemsPt ? tr(d.itemsPt, i.name) : p.name, flea: p.lastLowPrice,
-    trader: top && { name: top.vendor.name, price: top.priceRUB, image: trader?.imageLink },
+    trader: top && { name: top.vendor.name, price: top.priceRUB, image: trader?.imageLink, portrait: `https://tarkov.dev/images/traders/${top.vendor.normalizedName}-portrait.png` },
     perSlot: Math.round(best / (i.width * i.height)), quests: p.usedInTasks.map(t => t.name),
   };
 }
