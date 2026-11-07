@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { parseScreenshot, mapFromLogLine, mapKey } from './public/shared.js';
 
@@ -60,8 +61,32 @@ function pollLogs() {
   } catch { /* jogo ainda não instalado ou sem logs */ }
 }
 
+// /api: repassa a consulta ao tarkov.dev e guarda cópia em disco para quando a API cair.
+const API = process.env.TARKOV_API ?? 'https://api.tarkov.dev/graphql';
+const CACHE = path.join(import.meta.dirname, 'cache');
+function proxy(req, res) {
+  let body = '';
+  req.on('data', c => { body += c; if (body.length > 100_000) req.destroy(); });
+  req.on('end', async () => {
+    const file = path.join(CACHE, crypto.createHash('sha1').update(body).digest('hex') + '.json');
+    try {
+      const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(60_000) });
+      const text = await r.text();
+      if (!JSON.parse(text).data) throw new Error('sem dados');
+      fs.mkdirSync(CACHE, { recursive: true });
+      fs.writeFileSync(file, text);
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(text);
+    } catch {
+      fs.readFile(file, 'utf8', (err, text) => err
+        ? res.writeHead(503, { 'Content-Type': 'application/json' }).end('{"errors":[{"message":"API do tarkov.dev fora do ar e sem cópia salva. Tente mais tarde."}]}')
+        : res.writeHead(200, { 'Content-Type': 'application/json', 'X-Cache-Date': fs.statSync(file).mtime.toISOString() }).end(text));
+    }
+  });
+}
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 http.createServer((req, res) => {
+  if (req.url === '/api' && req.method === 'POST') return proxy(req, res);
   if (req.url === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
     for (const [type, data] of Object.entries(state)) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);

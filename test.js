@@ -1,6 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseScreenshot, mapFromLogLine, mapKey, armorGrade } from './public/shared.js';
+import { optimize } from './public/optimize.js';
+
+const trader = (priceRUB, minTraderLevel = 1) => ({ priceRUB, vendor: { normalizedName: 'prapor', minTraderLevel } });
+const fleaOffer = priceRUB => ({ priceRUB, vendor: { normalizedName: 'flea-market' } });
+const slot = (name, ids, required = false) => ({ name, required, filters: { allowedItems: ids.map(id => ({ id })) } });
+const mods = new Map([
+  ['stockA', { id: 'stockA', name: 'Stock A', recoilModifier: -10, ergonomicsModifier: 2, buyFor: [trader(1000)] }],
+  ['stockB', { id: 'stockB', name: 'Stock B', recoilModifier: -20, ergonomicsModifier: 0, buyFor: [fleaOffer(5000)], properties: { slots: [slot('Pad', ['padA'])] } }],
+  ['padA', { id: 'padA', name: 'Pad A', recoilModifier: -3, buyFor: [trader(200)] }],
+  ['brakeA', { id: 'brakeA', name: 'Brake A', recoilModifier: -5, buyFor: [trader(500)] }],
+  ['brakeB', { id: 'brakeB', name: 'Brake B', recoilModifier: -8, buyFor: [trader(3000, 3)] }],
+]);
+const gun = { properties: { ergonomics: 50, recoilVertical: 100, recoilHorizontal: 200, slots: [slot('Stock', ['stockA', 'stockB']), slot('Muzzle', ['brakeA', 'brakeB'], true)] } };
+const names = b => b.parts.map(p => p.mod.id).sort().join(',');
+
+test('build sem limite pega o menor recuo', () => {
+  const b = optimize(gun, mods);
+  assert.equal(names(b), 'brakeB,padA,stockB');
+  assert.equal(b.cost, 8200);
+  assert.equal(b.recoilVertical, 69);
+});
+
+test('build respeita orçamento, nível de trader e flea', () => {
+  assert.equal(names(optimize(gun, mods, { budget: 2000 })), 'brakeA,stockA');
+  assert.equal(names(optimize(gun, mods, { level: 2, flea: false })), 'brakeA,stockA');
+  assert.equal(optimize(gun, mods, { budget: 100 }), null); // slot obrigatório sem opção que caiba
+});
 
 test('screenshot com posição e rotação', () => {
   const p = parseScreenshot('2026-11-07[20-15]_123.45, 6.78, -90.12_0.0, 0.70711, 0.0, 0.70711_15.77 (0).png');
