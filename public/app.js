@@ -3,6 +3,7 @@ import { initMap, resizeMap } from './map.js';
 import { initAmmo } from './ammo.js';
 import { initBuild } from './build.js';
 import { initPrice } from './price.js';
+import { initSound } from './soundtab.js';
 
 // Abas
 for (const b of document.querySelectorAll('nav button')) {
@@ -18,3 +19,4 @@ initMap();
 initAmmo();
 initBuild();
 initPrice();
+initSound();

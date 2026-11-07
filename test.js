@@ -13,6 +13,21 @@ test('andar pela altura e pela área', () => {
   assert.equal(floorAt(undefined, { x: 0, y: 0, z: 0 }), -1);
 });
 import { optimize } from './public/optimize.js';
+import { BANDS, toBands, footstepProfile, suggestEq } from './public/sound.js';
+
+test('medidor de passos acha as bandas dos passos', () => {
+  const bg = BANDS.map(() => -60);
+  const step = BANDS.map(f => (f >= 2000 && f <= 4000 ? -35 : -58)); // passo forte entre 2 e 4 kHz
+  const frames = Array.from({ length: 100 }, (_, i) => (i % 10 === 0 ? step : bg));
+  const p = footstepProfile(frames);
+  assert.equal(p.events, 10);
+  const eq = suggestEq(p.diff);
+  for (const f of [2000, 2500, 3150]) assert.ok(eq.includes(`Fc ${f} Hz`), eq);
+  assert.ok(!eq.includes('Fc 1000 Hz'));
+  assert.equal(footstepProfile([bg]), null); // pouco som
+  // espectro plano de -50 dB vira -50 em todas as bandas
+  assert.ok(toBands(new Float32Array(2048).fill(-50), 48000, 4096).every(v => Math.abs(v + 50) < 0.01));
+});
 
 const trader = (priceRUB, minTraderLevel = 1) => ({ priceRUB, vendor: { normalizedName: 'prapor', minTraderLevel } });
 const fleaOffer = priceRUB => ({ priceRUB, vendor: { normalizedName: 'flea-market' } });

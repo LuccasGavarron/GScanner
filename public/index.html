@@ -30,6 +30,12 @@
   .ex-label::before { display: none; }
   .best { color: #7d7; font-weight: bold; }
   #price-q { width: 260px; }
+  #sound-chart { display: flex; align-items: flex-end; gap: 2px; height: 200px; margin: 8px 0; border-bottom: 1px solid #444; }
+  .sbar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .sbar div { width: 70%; background: #9a8866; border-radius: 4px 4px 0 0; }
+  .sbar .f { font-size: 10px; color: #888; margin-top: 2px; }
+  .sbar .v { font-size: 11px; color: #ddd; }
+  pre { background: #1b1b1b; padding: 8px; }
 </style>
 </head>
 <body>
@@ -39,6 +45,7 @@
   <button data-tab="tab-ammo">Munição</button>
   <button data-tab="tab-price">Preço</button>
   <button data-tab="tab-build">Armas</button>
+  <button data-tab="tab-sound">Som</button>
 </nav>
 
 <section id="tab-map" class="tab on">
@@ -72,6 +79,29 @@
     <span class="muted" id="price-status">Verde: onde vende melhor. ⚠: guarde, serve para quest.</span>
   </div>
   <table id="price"></table>
+</section>
+
+<section id="tab-sound" class="tab">
+  <div class="bar">
+    <select id="sound-profile" title="Perfil">
+      <option value="normal">Sem chuva</option>
+      <option value="chuva">Com chuva</option>
+    </select>
+    <button id="sound-go">Gravar som do PC</button>
+    <span class="muted" id="sound-status">Mede em quais frequências os passos se destacam do fundo.</span>
+  </div>
+  <ol class="muted" style="margin: 0 6px 6px; padding-left: 22px">
+    <li>Entre numa raid offline.</li>
+    <li>Clique em Gravar, escolha "Tela inteira" e marque "Compartilhar áudio do sistema".</li>
+    <li>Ande e corra uns 30 s em concreto, metal, madeira e grama.</li>
+    <li>Volte aqui e clique em Parar e analisar.</li>
+  </ol>
+  <div id="sound-result" hidden style="padding: 0 6px">
+    <b>Quanto os passos ficam acima do fundo, por frequência (dB)</b>
+    <div id="sound-chart"></div>
+    <p><b>Equalizador sugerido</b> (formato do Equalizer APO) <button id="sound-copy">Copiar</button></p>
+    <pre id="sound-eq"></pre>
+  </div>
 </section>
 
 <section id="tab-build" class="tab">
