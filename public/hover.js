@@ -1,9 +1,8 @@
-import { $, rub } from './api.js';
+import { $, rub, onEvent } from './api.js';
 
 // Cartão do item sob o mouse no jogo (servidor lê a dica do item com OCR)
 export function initHover() {
-  new EventSource('/events').onmessage = e => {
-    const { type, data: h } = JSON.parse(e.data);
+  onEvent((type, h) => {
     if (type !== 'hover') return;
     $('#hover-card').hidden = !h;
     if (!h) return;
@@ -17,5 +16,5 @@ export function initHover() {
         <div class="muted">Por slot: ${rub(h.perSlot)}</div>
         ${h.quests.length ? `<div>⚠ Quest: ${h.quests.join(', ')}</div>` : ''}
       </div>`;
-  };
+  });
 }

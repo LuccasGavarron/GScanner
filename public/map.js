@@ -1,4 +1,4 @@
-import { $ } from './api.js';
+import { $, onEvent } from './api.js';
 import { floorAt } from './shared.js';
 
 const MAPS_URL = 'https://raw.githubusercontent.com/the-hideout/tarkov-dev/main/src/data/maps.json';
@@ -50,7 +50,7 @@ async function warm(m, template) {
         urls.push(template.replace('{z}', z).replace('{x}', x).replace('{y}', y));
   }
   const next = async () => { while (urls.length && current === m) await fetch(urls.shift()).catch(() => {}); };
-  await Promise.all(Array.from({ length: 6 }, next));
+  await Promise.all(Array.from({ length: 2 }, next)); // só 2: deixa conexões livres para os tiles da tela
 }
 
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -214,8 +214,8 @@ function showMap(key) {
       svgFloor();
     });
   } else {
-    L.tileLayer(local(m.tilePath), { tileSize: m.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
-    warm(m, local(m.tilePath));
+    const base = L.tileLayer(local(m.tilePath), { tileSize: m.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
+    base.once('load', () => warm(m, local(m.tilePath))); // baixa o resto depois que a tela carregou
   }
   leaflet.fitBounds(bounds);
   const places = L.layerGroup().addTo(leaflet);
@@ -304,12 +304,11 @@ export async function initMap() {
   showMap('customs');
 
   // Eventos do servidor: mapa e início da raid pelo log, posição pelo screenshot, grupo pelo squad
-  new EventSource('/events').onmessage = e => {
-    const { type, data } = JSON.parse(e.data);
+  onEvent((type, data) => {
     if (type === 'map' && maps[data] && current !== maps[data]) showMap(data);
     if (type === 'position') showPosition(data);
     if (type === 'raidStart') raidStart = data;
     if (type === 'squad') { squadMembers = data; drawSquad(); }
     if (type === 'me') myName = data;
-  };
+  });
 }

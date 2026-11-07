@@ -1,4 +1,4 @@
-import { $ } from './api.js';
+import { $, onEvent } from './api.js';
 import { suggestEq } from './sound.js';
 
 // A gravação roda no servidor (som direto do Windows); a página só liga, acompanha e desliga.
@@ -71,5 +71,5 @@ export function initSound() {
   // perfis medidos antes ficam só no navegador: manda ao servidor ao abrir
   for (const name of ['normal', 'chuva']) { const p = JSON.parse(localStorage.getItem('gs-sound-' + name) ?? 'null'); if (p) sendProfile(name, p); }
   eqPost('/eq/status', {});
-  new EventSource('/events').onmessage = e => { const m = JSON.parse(e.data); if (m.type === 'eq') eqShow({ ...m.data }); };
+  onEvent((type, data) => type === 'eq' && eqShow({ ...data }));
 }
