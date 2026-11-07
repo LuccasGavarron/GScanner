@@ -221,8 +221,8 @@ async function cachedGet(name) {
 }
 // shortcut: cópia carregada uma vez por execução do servidor; reiniciar para pegar preços novos.
 let offlineCache;
-const offlineData = () => (offlineCache ??= Promise.all(['items', 'items_en', 'items_pt', 'traders', 'tasks', 'tasks_en'].map(cachedGet))
-  .then(([items, itemsEn, itemsPt, traders, tasks, tasksEn]) => ({ items, itemsEn: itemsEn.data, itemsPt: itemsPt.data, traders, tasks, tasksEn: tasksEn.data }))
+const offlineData = () => (offlineCache ??= Promise.all(['items', 'items_en', 'items_pt', 'traders', 'tasks', 'tasks_en', 'tasks_pt'].map(cachedGet))
+  .then(([items, itemsEn, itemsPt, traders, tasks, tasksEn, tasksPt]) => ({ items, itemsEn: itemsEn.data, itemsPt: itemsPt.data, traders, tasks, tasksEn: tasksEn.data, tasksPt: tasksPt.data }))
   .catch(e => { offlineCache = null; throw e; }));
 
 let extracts;
@@ -238,6 +238,29 @@ http.createServer((req, res) => {
   if (req.url.startsWith('/sound/') && req.method === 'POST') {
     const out = req.url === '/sound/start' ? (soundStart(), { ok: true }) : req.url === '/sound/stop' ? soundStop() : { secs: soundSecs(rec), error: rec?.done ? rec.error.split('\n')[0] : undefined };
     return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
+  }
+  if (req.url.startsWith('/tiles/')) { // tiles do mapa com cópia em disco: da segunda vez abre na hora
+    const rel = decodeURIComponent(req.url.slice(7).split('?')[0]);
+    if (!/^[\w.\-/]+$/.test(rel) || rel.includes('..')) return res.writeHead(400).end();
+    const file = path.join(CACHE, 'tiles', rel);
+    const send = body => res.writeHead(200, { 'Content-Type': rel.endsWith('.webp') ? 'image/webp' : 'image/png', 'Cache-Control': 'max-age=604800' }).end(body);
+    fs.readFile(file, async (err, body) => {
+      if (!err) return send(body);
+      try {
+        const r = await fetch('https://assets.tarkov.dev/maps/' + rel, { signal: AbortSignal.timeout(20_000) });
+        if (!r.ok) return res.writeHead(r.status).end();
+        const buf = Buffer.from(await r.arrayBuffer());
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFile(file, buf, () => {});
+        send(buf);
+      } catch { res.writeHead(504).end(); }
+    });
+    return;
+  }
+  if (req.url === '/tasks') {
+    Promise.all([offlineData(), cachedGet('maps')]).then(([d, maps]) => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(offline.tasks(d, maps, mapKey))),
+      () => res.writeHead(503).end('[]'));
+    return;
   }
   if (req.url === '/mapdata') {
     getExtracts().then(e => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(e)),

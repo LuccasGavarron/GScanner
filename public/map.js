@@ -32,6 +32,24 @@ const EX_NAME = { pmc: 'Extração PMC', scav: 'Extração Scav', shared: 'Extra
 const EX_SHOW = { pmc: ['pmc', 'shared', 'transit'], scav: ['scav', 'shared', 'transit'], all: Object.keys(EX_COLOR), none: [] };
 // shortcut: 5 m/s é a média andando e correndo; o tempo real muda com peso e stamina
 const SPEED = 5;
+// tiles pelo servidor local, que guarda cópia em disco
+const local = url => url.replace('https://assets.tarkov.dev/maps/', '/tiles/');
+const TILE_OPTS = { keepBuffer: 6, updateWhenZooming: false };
+
+// Baixa por trás os tiles dos primeiros níveis de zoom do mapa inteiro, para abrir sem buracos
+async function warm(m, template) {
+  const urls = [];
+  for (let z = m.minZoom; z <= Math.min(m.maxZoom, m.minZoom + 3); z++) {
+    const a = leaflet.project(bounds.getNorthWest(), z), b = leaflet.project(bounds.getSouthEast(), z);
+    const size = m.tileSize || 256;
+    for (let x = Math.floor(Math.min(a.x, b.x) / size); x <= Math.floor(Math.max(a.x, b.x) / size); x++)
+      for (let y = Math.floor(Math.min(a.y, b.y) / size); y <= Math.floor(Math.max(a.y, b.y) / size); y++)
+        urls.push(template.replace('{z}', z).replace('{x}', x).replace('{y}', y));
+  }
+  const next = async () => { while (urls.length && current === m) await fetch(urls.shift()).catch(() => {}); };
+  await Promise.all(Array.from({ length: 6 }, next));
+}
+
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const icon = (cls, html = '') => L.divIcon({ className: '', html: `<div class="${cls}">${html}</div>`, iconSize: [18, 18] });
 
@@ -120,7 +138,7 @@ function showFloor(i) {
   floorLayer?.remove();
   floorLayer = null;
   const l = current.layers?.[i];
-  if (l) floorLayer = L.tileLayer(l.tilePath, { tileSize: current.tileSize || 256, bounds }).addTo(leaflet);
+  if (l) floorLayer = L.tileLayer(local(l.tilePath), { tileSize: current.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
 }
 
 function setPing(latlng) {
@@ -142,8 +160,9 @@ function showMap(key) {
   floorLayer = null;
   // wheelPxPerZoomLevel alto = rodinha menos sensível (padrão do Leaflet é 60)
   leaflet = L.map('map', { crs: crs(m), minZoom: m.minZoom, maxZoom: m.maxZoom, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 200, attributionControl: false, preferCanvas: true });
-  L.tileLayer(m.tilePath, { tileSize: m.tileSize || 256, bounds }).addTo(leaflet);
+  L.tileLayer(local(m.tilePath), { tileSize: m.tileSize || 256, bounds, ...TILE_OPTS }).addTo(leaflet);
   leaflet.fitBounds(bounds);
+  warm(m, local(m.tilePath));
   const places = L.layerGroup().addTo(leaflet);
   for (const l of m.labels ?? []) {
     L.marker([l.position[1], l.position[0]], { icon: L.divIcon({ className: '', html: `<span class="place">${l.text}</span>`, iconSize: null }), interactive: false }).addTo(places);

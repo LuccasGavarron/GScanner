@@ -97,6 +97,34 @@ export function mapLayers(maps, en, d, mapKey) {
   return out;
 }
 
+// ---------- Missões: tudo o que o painel do mapa precisa, em português quando houver ----------
+export function tasks(d, maps, mapKey) {
+  const T = k => tr(d.tasksPt ?? {}, k) === k ? tr(d.tasksEn, k) : tr(d.tasksPt, k);
+  const keyOfMap = new Map(Object.values(maps.data.maps).map(m => [m.id, mapKey(m.nameId)]));
+  const itemById = new Map(items(d).map(i => [i.id, i]));
+  const item = id => {
+    const i = itemById.get(id);
+    if (i) return { name: tr(d.itemsPt ?? d.itemsEn, i.name), icon: i.iconLink, price: fleaPrice(i) || null };
+    const q = d.tasks.data.questItems[id];
+    return q ? { name: T(q.name), icon: q.iconLink, quest: true } : null;
+  };
+  const traders = d.traders.data;
+  const pos = p => ({ x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 });
+  return Object.values(d.tasks.data.tasks).map(t => ({
+    id: t.id, name: T(t.name), image: t.taskImageLink, wiki: t.wikiLink, level: t.minPlayerLevel, kappa: t.kappaRequired,
+    trader: { name: vendorName(traders[t.trader]?.normalizedName ?? ''), image: traders[t.trader]?.imageLink },
+    map: keyOfMap.get(t.map) ?? null,
+    keys: (t.neededKeys ?? []).flatMap(k => k.keys.map(id => ({ ...item(id), map: keyOfMap.get(k.map) }))),
+    objectives: t.objectives.map(o => ({
+      type: o.type, text: T(o.description), optional: o.optional, count: o.count ?? 1, fir: !!o.foundInRaid,
+      items: [...(o.items ?? []).slice(0, 6), o.questItem, o.markerItem].filter(Boolean).map(item).filter(Boolean),
+      zones: (o.zones ?? []).map(z => ({ map: keyOfMap.get(z.map), outline: z.outline.map(pos), ...pos(z.position) })),
+      locations: (o.possibleLocations ?? []).flatMap(l => l.positions.map(p => ({ map: keyOfMap.get(l.map), ...pos(p) }))),
+      maps: (o.maps ?? []).map(id => keyOfMap.get(id)).filter(Boolean),
+    })),
+  }));
+}
+
 // ---------- Hover: nome lido pelo OCR -> item ----------
 const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
