@@ -33,6 +33,11 @@ function watchShots() {
       if (pos) publish('position', pos);
     });
     console.log('Screenshots:', SHOTS);
+    // print mais recente dos últimos 10 min: pega a posição mesmo se o servidor subiu depois dele
+    const last = fs.readdirSync(SHOTS).filter(f => f.endsWith('.png'))
+      .map(f => ({ f, t: fs.statSync(path.join(SHOTS, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0];
+    const pos = last && Date.now() - last.t < 600_000 && parseScreenshot(last.f);
+    if (pos) publish('position', pos);
   } catch {
     setTimeout(watchShots, 10_000); // pasta só existe depois do primeiro print no jogo
   }
