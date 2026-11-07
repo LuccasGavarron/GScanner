@@ -38,3 +38,5 @@ Cada amigo roda o próprio GScanner. Um de vocês é o anfitrião.
 3. Rode `npm start` em todos.
 
 O anfitrião precisa estar acessível pelos amigos: mesma rede, Tailscale ou a porta 7777 liberada no roteador. Sem a senha certa, o anfitrião recusa a posição. Cada print no jogo atualiza a sua posição no mapa dos outros, e o ping (clique no mapa) aparece para todos.
+
+Pelo Tailscale (amigos em outras casas): todos instalam o Tailscale e entram na mesma rede. O `squadUrl` dos amigos usa o IP `100.x` do anfitrião (`tailscale ip -4`). O Windows trata a rede do Tailscale como Privada: no anfitrião, libere a porta 7777 nesse perfil (`New-NetFirewallRule -DisplayName GScanner -Direction Inbound -Protocol TCP -LocalPort 7777 -Profile Private -Action Allow`, como administrador).
