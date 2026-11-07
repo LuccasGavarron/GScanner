@@ -179,13 +179,17 @@ export function findItem(d, lines) {
     if (n.length < 5) continue;
     if (idx.has(n)) return idx.get(n);
     for (const [name, item] of idx) {
-      if (Math.abs(name.length - n.length) > n.length * 0.15) continue;
+      if (n.length < 10 || Math.abs(name.length - n.length) > n.length * 0.15) continue; // nome curto: só exato
       const score = 1 - lev(n, name) / Math.max(n.length, name.length);
-      if (score >= 0.85 && (!best || score > best.score)) best = { score, item };
+      if (score >= 0.88 && (!best || score > best.score)) best = { score, item };
     }
   }
   return best?.item ?? null;
 }
+
+// Só o texto colado ao cursor: a dica do jogo nasce ali (à direita, um pouco acima). Fora dessa área há rótulos
+// da tela ("SLOT ESPECIAL", "Gravado") que viravam item errado na busca aproximada.
+export const nearCursor = boxes => boxes.filter(b => Array.isArray(b) && b[1] >= -20 && b[1] <= 160 && b[2] >= -140 && b[2] <= 60);
 
 // Rótulo curto do item na grade ("Berkut", "MRS"): aparece na hora, antes da dica do jogo (que demora ~0,5 s).
 // boxes: [texto, esquerda, topo, direita, base] com o cursor em (0, 0). O rótulo fica no canto de cima à direita
@@ -193,21 +197,38 @@ export function findItem(d, lines) {
 const shortIndexes = new WeakMap();
 export function pickByLabel(d, boxes) {
   if (!shortIndexes.has(d)) {
-    const idx = new Map();
-    for (const i of items(d)) {
-      for (const en of [d.itemsPt, d.itemsEn]) {
-        const n = norm(tr(en ?? {}, i.shortName));
+    // português primeiro (o jogo está em pt); o inglês só preenche nomes que o português não tem
+    const byLang = lang => {
+      const m = new Map();
+      for (const i of items(d)) {
+        const n = norm(tr(lang ?? {}, i.shortName));
         if (n.length < 2) continue;
-        const prev = idx.get(n);
-        idx.set(n, prev && prev !== i ? 'ambíguo' : i); // nome curto repetido: não dá para saber qual é
+        const prev = m.get(n);
+        m.set(n, prev && prev !== i ? 'ambíguo' : i); // nome curto repetido: não dá para saber qual é
       }
-    }
+      return m;
+    };
+    const idx = byLang(d.itemsPt);
+    for (const [n, v] of byLang(d.itemsEn)) if (!idx.has(n)) idx.set(n, v);
     shortIndexes.set(d, idx);
   }
   const idx = shortIndexes.get(d);
   const hits = boxes.filter(([t, , top, right]) => top <= 0 && top >= -330 && right >= 0 && right <= 330 && idx.get(norm(t)) instanceof Object && idx.get(norm(t)) !== 'ambíguo')
     .sort((a, b) => b[2] - a[2] || a[3] - b[3]);
   return hits.length ? idx.get(norm(hits[0][0])) : null;
+}
+
+// Em raid, mirando num item no chão: o jogo escreve o nome curto logo abaixo da mira ("T-45M1").
+// boxes vêm de um retângulo pequeno no centro da tela, com o centro em (0, 0). Vale nome completo ou nome curto único,
+// o mais perto da mira.
+export function raidPick(d, boxes) {
+  pickByLabel(d, []); // garante o índice de nomes curtos
+  const shorts = shortIndexes.get(d), full = nameIndex(d);
+  const hits = boxes.map(b => {
+    const n = norm(b[0]), s = shorts.get(n);
+    return { item: full.get(n) ?? (s instanceof Object ? s : null), dist: Math.hypot((b[1] + b[3]) / 2, (b[2] + b[4]) / 2) };
+  }).filter(h => h.item).sort((a, b) => a.dist - b.dist);
+  return hits[0]?.item ?? null;
 }
 
 export function hoverInfo(d, i) {
@@ -218,7 +239,7 @@ export function hoverInfo(d, i) {
   return {
     name: d.itemsPt ? tr(d.itemsPt, i.name) : p.name, flea: p.lastLowPrice,
     trader: top && { name: top.vendor.name, price: top.priceRUB, image: trader?.imageLink, portrait: `https://tarkov.dev/images/traders/${top.vendor.normalizedName}-portrait.png` },
-    perSlot: Math.round(best / (i.width * i.height)), quests: p.usedInTasks.map(t => t.name),
+    perSlot: Math.round(best / (i.width * i.height)), quests: [...new Set(p.usedInTasks.map(t => t.name))], // uma vez por quest, não por objetivo
     ...gearInfo(d, i),
   };
 }

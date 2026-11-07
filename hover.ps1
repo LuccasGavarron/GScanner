@@ -60,20 +60,29 @@ function Lines-Json($lines, [int]$cx, [int]$cy) {
 if ($args.Count) { $b = [Drawing.Bitmap]::new($args[0]); Lines-Json (Read-Text $b) ([int]$args[1]) ([int]$args[2]); exit } # teste: imagem, x e y do cursor nela
 
 $last = ''; $lastSig = 0; $n = 0
+Add-Type -AssemblyName System.Windows.Forms
+function Emit($json) { if ($json -ne $script:last) { $script:last = $json; [Console]::Out.WriteLine($json); [Console]::Out.Flush() } }
 while ($true) {
-  Start-Sleep -Milliseconds 80
   if (($n++ % 50) -eq 0 -and $env:GSCANNER_PID -and -not (Get-Process -Id $env:GSCANNER_PID -ErrorAction SilentlyContinue)) { exit } # servidor caiu
-  if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov' -or -not [Win]::CursorVisible()) {
-    if ($last -ne '[]') { $last = '[]'; [Console]::Out.WriteLine($last); [Console]::Out.Flush() } # fora do jogo ou em raid (sem cursor): esconde o cartão e não lê nada
-    continue
+  if ([Win]::ForegroundProcess() -ne 'EscapeFromTarkov') { Emit '[]'; Start-Sleep -Milliseconds 200; continue } # fora do jogo: esconde o cartão
+  if ([Win]::CursorVisible()) {
+    # Inventário: região em volta do cursor; pega a dica do item (ao lado) e o rótulo na grade (acima, até 330 px)
+    Start-Sleep -Milliseconds 80
+    $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
+    $bmp = New-Object Drawing.Bitmap 1000, 420
+    $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 300, $p.Y - 340, 0, 0, $bmp.Size); $g.Dispose()
+    $cx = 300; $cy = 340; $raid = $false
+  } else {
+    # Raid (o jogo esconde o cursor): retângulo no centro, onde aparece o nome curto do item mirado, abaixo da mira
+    Start-Sleep -Milliseconds 150
+    $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $bmp = New-Object Drawing.Bitmap 440, 220
+    $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($s.X + $s.Width / 2 - 220, $s.Y + $s.Height / 2 - 90, 0, 0, $bmp.Size); $g.Dispose()
+    $cx = 220; $cy = 90; $raid = $true
   }
-  $p = New-Object Win+POINT; [void][Win]::GetCursorPos([ref]$p)
-  # Região em volta do cursor: pega a dica do item (ao lado) e o rótulo do item na grade (acima, até 330 px para itens altos)
-  $bmp = New-Object Drawing.Bitmap 1000, 420
-  $g = [Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($p.X - 300, $p.Y - 340, 0, 0, $bmp.Size); $g.Dispose()
   $sig = [Win]::Sig($bmp)
   if ($sig -eq $lastSig) { $bmp.Dispose(); continue }
   $lastSig = $sig
-  $json = Lines-Json @(Read-Text $bmp) 300 340; $bmp.Dispose()
-  if ($json -ne $last) { $last = $json; [Console]::Out.WriteLine($json); [Console]::Out.Flush() }
+  $json = Lines-Json @(Read-Text $bmp) $cx $cy; $bmp.Dispose()
+  Emit $(if ($raid) { '{"raid":1,"l":' + $json + '}' } else { $json })
 }

@@ -33,7 +33,7 @@ test('FFT acha o tom certo', () => {
   const bands = toBands(db, rate, n);
   assert.equal(BANDS[bands.indexOf(Math.max(...bands))], 3150); // 3 kHz cai na banda de 3,15 kHz
 });
-import { answer, findItem, hoverInfo, pickByLabel, encodeInvite, decodeInvite } from './offline.js';
+import { answer, findItem, hoverInfo, pickByLabel, nearCursor, raidPick, encodeInvite, decodeInvite } from './offline.js';
 
 test('código de convite ida e volta, e recusa lixo', () => {
   const code = encodeInvite('http://100.109.154.42:7777', 'senha-do-grupo');
@@ -74,6 +74,13 @@ test('cópia JSON vira resposta das abas', () => {
   assert.equal(pickByLabel(d, [['LEDX', -40, -60, 20, -48], ['Lug', -150, -60, -90, -48]]).id, 'l');
   assert.equal(pickByLabel(d, [['Lug', -150, -60, -90, -48]]), null); // à esquerda do cursor: é de outro item
   assert.equal(pickByLabel(d, [['LEDX', -40, 30, 20, 42]]), null); // abaixo do cursor: é de outro item
+  // só texto colado ao cursor conta para a dica; "Gravado" do slot especial (longe) fica de fora
+  assert.deepEqual(nearCursor([['Gravado', 58, -284, 124, -272], ['Transiluminador de pele LEDX', 38, -67, 300, -49]]).map(b => b[0]), ['Transiluminador de pele LEDX']);
+  assert.equal(findItem(d, ['Transiluminador de pele LEDY']).id, 'l'); // nome longo: aceita 1 letra errada
+  assert.equal(findItem(d, ['Lugar']), null); // nome curto: só exato (não vira "Luger")
+  // raid: nome curto abaixo da mira, o mais perto do centro; "PEGAR" e lixo não contam
+  assert.equal(raidPick(d, [['PEGAR', -30, -50, 30, -38], ['LEDX', -25, 40, 25, 52]]).id, 'l');
+  assert.equal(raidPick(d, [['PEGAR', -30, -50, 30, -38]]), null);
   const h = hoverInfo(d, findItem(d, ['Transiluminador de pele LEDX']));
   assert.deepEqual([h.name, h.flea, h.trader.name, h.trader.image, h.perSlot, h.quests], ['Transiluminador de pele LEDX', 500000, 'Prapor', 'prapor.webp', 500000, ['Private Clinic']]);
 });

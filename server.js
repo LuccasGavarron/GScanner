@@ -146,12 +146,18 @@ function watchHover() {
     for (const l of lines) {
       try {
         const d = await offlineData();
-        const boxes = [].concat(JSON.parse(l) ?? []);
-        // nome completo da dica do jogo vence; sem dica ainda, o rótulo curto da grade dá o item na hora
-        const byName = offline.findItem(d, boxes.map(b => (Array.isArray(b) ? b[0] : b)));
-        const item = byName ?? offline.pickByLabel(d, boxes.filter(Array.isArray));
-        hoverLog(`${item ? (byName ? 'dica ' : 'rótulo ') + item.normalizedName : '-'} <= ${l.trim()}`);
-        if (item && item.id !== lastId) { lastId = item.id; publish('hover', offline.hoverInfo(d, item)); }
+        const msg = JSON.parse(l);
+        const raid = !Array.isArray(msg) && !!msg?.raid;
+        const boxes = (raid ? msg.l : msg ?? []).filter(Array.isArray);
+        let item, how;
+        if (raid) [item, how] = [offline.raidPick(d, boxes), 'mira']; // em raid: nome curto abaixo da mira
+        else {
+          // inventário: nome completo da dica (colada ao cursor) vence; sem dica ainda, o rótulo da grade dá o item na hora
+          const byName = offline.findItem(d, offline.nearCursor(boxes).map(b => b[0]));
+          [item, how] = [byName ?? offline.pickByLabel(d, boxes), byName ? 'dica' : 'rótulo'];
+        }
+        hoverLog(`${item ? how + ' ' + item.normalizedName : '-'} <= ${l.trim()}`);
+        if (item && item.id !== lastId) { lastId = item.id; publish('hover', { ...offline.hoverInfo(d, item), raid }); }
         if (!item && lastId) { lastId = null; publish('hover', null); } // dica sumiu: esconde o cartão
       } catch { /* linha incompleta ou sem dados: ignora */ }
     }
